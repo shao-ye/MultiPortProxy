@@ -21,12 +21,19 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: 生成版本信息与图标资源
+        # 把产品名/版本/版权/图标写入 exe，提升正规度、降低杀软启发式误报
+        run: |
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+          "$(go env GOPATH)/bin/goversioninfo" -64 -o resource_windows_amd64.syso -icon app.ico versioninfo.json
+
       - name: 交叉编译 Windows exe
         env:
           GOOS: windows
           GOARCH: amd64
           CGO_ENABLED: '0'
         # -H windowsgui：运行时不弹控制台黑窗口；-s -w：去符号表减小体积
+        # 同目录的 resource_windows_amd64.syso 会被 go build 自动嵌入
         run: go build -ldflags "-H windowsgui -s -w" -o NodePortProxy.exe .
 
       - name: 打包发布物

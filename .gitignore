@@ -25,3 +25,6 @@ Thumbs.db
 
 # 本地维护文档（不公开上传）
 发版步骤.md
+
+# goversioninfo 生成的资源文件（由 CI 现生成，不入库）
+*.syso
