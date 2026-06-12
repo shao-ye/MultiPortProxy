@@ -1,0 +1,3 @@
+# 仓库顶部 Sponsor 按钮配置
+# custom 链接指向 README 中的支付宝收款码图片
+custom: ["https://github.com/shao-ye/MultiPortProxy/blob/main/docs/donate-alipay.png"]

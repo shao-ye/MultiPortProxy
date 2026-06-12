@@ -76,6 +76,12 @@ go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
 - **杀毒软件拦截 / 无法运行？**
   自行编译的无签名 exe 可能被 360、Windows Defender 等误报。把程序所在目录加入信任区/白名单即可。
 
+### 赞助支持
+
+如果这个项目帮到了你，可以请作者喝杯咖啡 ☕，感谢支持！
+
+<img src="docs/donate-alipay.png" alt="支付宝收款码" width="240">
+
 ### 免责声明
 
 本工具仅用于在**本机**对你**自己拥有合法使用权**的代理节点做端口管理与分发，方便多环境调试等技术用途。使用者须遵守所在国家和地区的法律法规，并对自己的使用行为负全部责任。作者不对任何滥用行为承担责任。
@@ -110,6 +116,10 @@ Pure Go standard library, no third-party dependencies.
 ### License & cores
 
 Licensed under the [MIT License](LICENSE). This project only **invokes** the user's locally installed `mihomo` (GPL-3.0) and `xray` (MPL-2.0) cores via separate processes; it does **not** bundle, link, or redistribute them, and therefore is not a derivative work of either core.
+
+### Donate
+
+If this project helps you, consider buying the author a coffee ☕ via the Alipay QR code above (see [赞助支持](#赞助支持)).
 
 ### Disclaimer
 
