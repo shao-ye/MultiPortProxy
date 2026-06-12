@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiPortProxy · 多节点端口代理</title>
+<meta name="description" content="把多个代理节点分别映射到本机的不同端口，每个端口同时提供 socks5/http，供指纹浏览器多环境同时使用不同节点。复用 v2rayN 内核，纯 Go 实现。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔌</text></svg>">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --bg2: #11151f;
+    --card: #161b27;
+    --border: #232a3a;
+    --text: #e4e8f1;
+    --muted: #8a93a6;
+    --brand: #3b82f6;
+    --brand2: #06b6d4;
+    --accent: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- 导航 ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(11,14,20,.8); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .wrap { display: flex; align-items: center; height: 62px; gap: 20px; }
+  .logo { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .logo .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  nav .spacer { flex: 1; }
+  nav a.navlink { color: var(--muted); font-size: 14px; transition: color .2s; }
+  nav a.navlink:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 9px; font-size: 14px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--card); transition: all .2s;
+  }
+  .btn:hover { border-color: var(--brand); transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(135deg, var(--brand), var(--brand2)); border: none; color: #fff; }
+  .btn.primary:hover { box-shadow: 0 8px 24px rgba(59,130,246,.35); }
+
+  /* ---------- Hero ---------- */
+  header { padding: 90px 0 70px; text-align: center; position: relative; overflow: hidden; }
+  header::before {
+    content: ""; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 500px; background: radial-gradient(ellipse, rgba(59,130,246,.18), transparent 70%);
+    pointer-events: none;
+  }
+  .tag {
+    display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 12.5px;
+    color: var(--brand2); background: rgba(6,182,212,.1); border: 1px solid rgba(6,182,212,.25);
+    margin-bottom: 22px;
+  }
+  h1 {
+    font-size: 52px; line-height: 1.15; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(120deg, #fff 30%, #9bc2ff); -webkit-background-clip: text;
+    background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 18px;
+  }
+  header .sub { font-size: 18px; color: var(--muted); max-width: 620px; margin: 0 auto 34px; }
+  .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  /* ---------- 端口映射示意 ---------- */
+  .diagram {
+    margin: 56px auto 0; max-width: 720px; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 26px; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px;
+    align-items: center; font-size: 13px; position: relative;
+  }
+  .diagram .col { display: flex; flex-direction: column; gap: 9px; }
+  .diagram .node {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    text-align: center; white-space: nowrap;
+  }
+  .diagram .port { color: var(--brand2); font-family: Consolas, monospace; }
+  .diagram .arrow { color: var(--muted); font-size: 18px; text-align: center; }
+  .diagram .core {
+    background: linear-gradient(135deg, rgba(59,130,246,.15), rgba(6,182,212,.12));
+    border: 1px solid rgba(59,130,246,.3); border-radius: 10px; padding: 14px 10px; text-align: center;
+    font-weight: 600;
+  }
+  .diagram .egress { color: var(--accent); }
+
+  /* ---------- 通用 section ---------- */
+  section { padding: 70px 0; }
+  .section-title { text-align: center; margin-bottom: 14px; font-size: 32px; font-weight: 700; }
+  .section-desc { text-align: center; color: var(--muted); margin-bottom: 46px; }
+
+  /* ---------- 特性卡片 ---------- */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .feature {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
+    transition: all .25s;
+  }
+  .feature:hover { border-color: var(--brand); transform: translateY(-3px); }
+  .feature .icon { font-size: 26px; margin-bottom: 12px; }
+  .feature h3 { font-size: 16.5px; margin-bottom: 8px; }
+  .feature p { font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- 截图 ---------- */
+  .shot { text-align: center; }
+  .shot img {
+    max-width: 100%; border-radius: 14px; border: 1px solid var(--border);
+    box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+
+  /* ---------- 下载 ---------- */
+  .download-box {
+    background: linear-gradient(135deg, var(--bg2), var(--card)); border: 1px solid var(--border);
+    border-radius: 18px; padding: 48px; text-align: center; max-width: 640px; margin: 0 auto;
+  }
+  .download-box .ver { color: var(--accent); font-family: Consolas, monospace; font-size: 14px; margin-top: 14px; }
+  .download-box .note { color: var(--muted); font-size: 13px; margin-top: 18px; }
+
+  /* ---------- 赞助 ---------- */
+  .sponsor { text-align: center; }
+  .sponsor .qr {
+    display: inline-block; background: #fff; padding: 14px; border-radius: 14px; margin-top: 24px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+  }
+  .sponsor .qr img { width: 230px; display: block; border-radius: 6px; }
+  .sponsor .thanks { color: var(--muted); margin-top: 20px; font-size: 14px; }
+
+  /* ---------- 免责 + footer ---------- */
+  .disclaimer {
+    max-width: 760px; margin: 60px auto 0; padding: 20px 24px; border-radius: 12px;
+    background: var(--bg2); border: 1px solid var(--border); color: var(--muted); font-size: 13px; line-height: 1.8;
+  }
+  footer { border-top: 1px solid var(--border); padding: 36px 0; text-align: center; color: var(--muted); font-size: 13px; }
+  footer a { color: var(--brand2); }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 760px) {
+    h1 { font-size: 36px; }
+    .features { grid-template-columns: 1fr; }
+    .diagram { grid-template-columns: 1fr; gap: 14px; }
+    .diagram .arrow { transform: rotate(90deg); }
+    nav .navlink { display: none; }
+    .download-box { padding: 32px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 导航 -->
+<nav>
+  <div class="wrap">
+    <span class="logo"><span class="dot"></span>MultiPortProxy</span>
+    <span class="spacer"></span>
+    <a class="navlink" href="#features">特性</a>
+    <a class="navlink" href="#screenshot">截图</a>
+    <a class="navlink" href="#download">下载</a>
+    <a class="navlink" href="#sponsor">赞助</a>
+    <a class="btn" href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header>
+  <div class="wrap">
+    <span class="tag">复用 v2rayN 内核 · 零第三方依赖 · 单文件运行</span>
+    <h1>多节点端口代理</h1>
+    <p class="sub">把多个代理节点分别映射到本机的不同端口，每个端口同时提供 socks5 / http，让指纹浏览器的不同环境可以<strong>同时</strong>走不同节点出口。</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/shao-ye/MultiPortProxy/releases/latest/download/NodePortProxy.exe">⬇ 下载 Windows 版</a>
+      <a class="btn" href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">★ GitHub 开源</a>
+    </div>
+
+    <!-- 端口映射示意图 -->
+    <div class="diagram">
+      <div class="col">
+        <div class="node">指纹浏览器环境 1</div>
+        <div class="node">指纹浏览器环境 2</div>
+        <div class="node">指纹浏览器环境 3</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="col">
+        <div class="node"><span class="port">127.0.0.1:20001</span></div>
+        <div class="node"><span class="port">127.0.0.1:20002</span></div>
+        <div class="node"><span class="port">127.0.0.1:20003</span></div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="col">
+        <div class="core">mihomo / xray<br>内核</div>
+        <div class="node egress">节点 1 · 2 · 3<br>各自独立出口</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- 特性 -->
+<section id="features">
+  <div class="wrap">
+    <h2 class="section-title">核心特性</h2>
+    <p class="section-desc">为「指纹浏览器多环境、每个环境一个独立节点」而生</p>
+    <div class="features">
+      <div class="feature"><div class="icon">🔌</div><h3>多端口映射</h3><p>每个节点独占一个本地端口，同一端口同时支持 socks5 与 http（mixed），互不干扰。</p></div>
+      <div class="feature"><div class="icon">📋</div><h3>批量导入</h3><p>直接粘贴 v2rayN 的节点分享链接，支持多行一次导入，自动分配端口。</p></div>
+      <div class="feature"><div class="icon">🧩</div><h3>多协议支持</h3><p>VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp 全覆盖。</p></div>
+      <div class="feature"><div class="icon">⚙️</div><h3>双内核架构</h3><p>常规协议走 mihomo；xhttp 节点自动改由 xray 承载并桥接，无需手动配置。</p></div>
+      <div class="feature"><div class="icon">⚡</div><h3>延迟测试</h3><p>一键测试每个端口的真实连通性与延迟，节点状态一目了然。</p></div>
+      <div class="feature"><div class="icon">♻️</div><h3>复用 v2rayN 内核</h3><p>不打包内核，自动探测 v2rayN 自带的 mihomo / xray，与 v2rayN 共存不冲突。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 截图 -->
+<section id="screenshot" style="background:var(--bg2);">
+  <div class="wrap shot">
+    <h2 class="section-title">界面预览</h2>
+    <p class="section-desc">内嵌网页界面，以独立窗口弹出，体验接近原生桌面应用</p>
+    <img src="assets/screenshot.png" alt="MultiPortProxy 应用界面">
+  </div>
+</section>
+
+<!-- 下载 -->
+<section id="download">
+  <div class="wrap">
+    <div class="download-box">
+      <h2 class="section-title" style="margin-bottom:10px;">立即下载</h2>
+      <p class="section-desc" style="margin-bottom:26px;">单文件可执行程序，双击即用，无需安装</p>
+      <a class="btn primary" style="font-size:15px;padding:13px 28px;" href="https://github.com/shao-ye/MultiPortProxy/releases/latest/download/NodePortProxy.exe">⬇ NodePortProxy.exe（Windows 64 位）</a>
+      <div class="ver">最新版本见 <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a></div>
+      <p class="note">需自备 mihomo / xray 内核（可直接复用 v2rayN 安装目录下的）</p>
+    </div>
+  </div>
+</section>
+
+<!-- 赞助 -->
+<section id="sponsor" style="background:var(--bg2);">
+  <div class="wrap sponsor">
+    <h2 class="section-title">❤️ 赞助支持</h2>
+    <p class="section-desc">开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡 ☕</p>
+    <div class="qr"><img src="assets/donate-alipay.png" alt="支付宝收款码"></div>
+    <p class="thanks">打开支付宝扫一扫 · 感谢每一份支持 🙏</p>
+  </div>
+</section>
+
+<!-- 免责声明 -->
+<div class="wrap">
+  <div class="disclaimer">
+    <strong>免责声明：</strong>本工具仅用于在本机对你自己拥有合法使用权的代理节点做端口管理与分发，方便多环境调试等技术用途。使用者须遵守所在国家和地区的法律法规，并对自己的使用行为负全部责任。作者不对任何滥用行为承担责任。
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div class="wrap">
+    MultiPortProxy · MIT License ·
+    <a href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

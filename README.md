@@ -6,6 +6,8 @@
 
 > 复用 [v2rayN](https://github.com/2dust/v2rayN) 自带的 `mihomo` / `xray` 内核，无需额外下载内核；纯 Go 标准库实现，零第三方依赖，编译即单文件可执行程序。
 
+🌐 **项目主页：[mpp.shaoyeai.com](https://mpp.shaoyeai.com)** ｜ 📦 **[下载最新版](https://github.com/shao-ye/MultiPortProxy/releases/latest)**
+
 ![应用界面截图](docs/screenshot.png)
 
 ---
@@ -80,7 +82,9 @@ go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
 
 开源不易，如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
 
-[![支付宝赞赏](https://img.shields.io/badge/%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E6%94%AF%E4%BB%98%E5%AE%9D%E8%B5%9E%E8%B5%8F-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](docs/donate-alipay.png)
+[![请我喝杯咖啡](https://img.shields.io/badge/%E2%98%95_%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E6%94%AF%E4%BB%98%E5%AE%9D-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
+
+> 项目主页：**[mpp.shaoyeai.com](https://mpp.shaoyeai.com)**
 
 <details>
 <summary>📱 点击展开支付宝收款码</summary>
@@ -127,7 +131,9 @@ Licensed under the [MIT License](LICENSE). This project only **invokes** the use
 
 If this project helps you, consider buying the author a coffee ☕
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy_me_a_coffee-Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](docs/donate-alipay.png)
+[![Buy me a coffee](https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
+
+> Project site: **[mpp.shaoyeai.com](https://mpp.shaoyeai.com)**
 
 <details>
 <summary>📱 Alipay QR code</summary>
