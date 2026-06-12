@@ -6,8 +6,8 @@
 
 [![项目主页](https://img.shields.io/badge/%E9%A1%B9%E7%9B%AE%E4%B8%BB%E9%A1%B5-mpp.shaoyeai.com-3b82f6?style=for-the-badge&logo=cloudflare&logoColor=white)](https://mpp.shaoyeai.com)
 [![下载](https://img.shields.io/github/v/release/shao-ye/MultiPortProxy?style=for-the-badge&label=%E4%B8%8B%E8%BD%BD&color=06b6d4&logo=windows&logoColor=white)](https://github.com/shao-ye/MultiPortProxy/releases/latest)
-[![Stars](https://img.shields.io/github/stars/shao-ye/MultiPortProxy?style=for-the-badge&color=eab308)](https://github.com/shao-ye/MultiPortProxy/stargazers)
-[![License](https://img.shields.io/github/license/shao-ye/MultiPortProxy?style=for-the-badge&color=34d399)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
+[![License](https://img.shields.io/badge/License-MIT-34d399?style=for-the-badge)](LICENSE)
 
 </div>
 
