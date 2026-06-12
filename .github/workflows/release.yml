@@ -1,0 +1,48 @@
+name: Release
+
+# 打 tag（形如 v1.0.0）时自动交叉编译 Windows 可执行程序并发布 Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # 创建 Release 需要写权限
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: 交叉编译 Windows exe
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        # -H windowsgui：运行时不弹控制台黑窗口；-s -w：去符号表减小体积
+        run: go build -ldflags "-H windowsgui -s -w" -o NodePortProxy.exe .
+
+      - name: 打包发布物
+        run: |
+          mkdir -p dist
+          cp NodePortProxy.exe dist/
+          cp README.md dist/
+          cp state.example.json dist/
+          cp LICENSE dist/
+          cd dist && zip -r "../NodePortProxy-${GITHUB_REF_NAME}-windows-amd64.zip" .
+
+      - name: 创建 Release 并上传产物
+        uses: softprops/action-gh-release@v2
+        with:
+          # 同时提供裸 exe 和打包 zip，方便不同需求下载
+          files: |
+            NodePortProxy.exe
+            NodePortProxy-*-windows-amd64.zip
+          generate_release_notes: true   # 自动根据提交生成发布说明

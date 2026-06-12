@@ -6,6 +6,8 @@
 
 > 复用 [v2rayN](https://github.com/2dust/v2rayN) 自带的 `mihomo` / `xray` 内核，无需额外下载内核；纯 Go 标准库实现，零第三方依赖，编译即单文件可执行程序。
 
+![应用界面截图](docs/screenshot.png)
+
 ---
 
 ## 中文
