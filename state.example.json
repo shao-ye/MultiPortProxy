@@ -1,0 +1,17 @@
+{
+  "settings": {
+    "corePath": "C:\\Program Files\\v2rayN\\bin\\mihomo\\mihomo.exe",
+    "xrayPath": "C:\\Program Files\\v2rayN\\bin\\xray\\xray.exe",
+    "allowLan": false,
+    "basePort": 20001
+  },
+  "autoStart": false,
+  "nodes": [
+    {
+      "id": "0000000000000000",
+      "name": "示例节点（请勿填写真实信息，运行时通过界面导入）",
+      "link": "vless://00000000-0000-0000-0000-000000000000@example.com:443?encryption=none&security=tls&sni=example.com&type=ws&host=example.com&path=%2F#example",
+      "port": 20001
+    }
+  ]
+}

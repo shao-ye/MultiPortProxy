@@ -1,0 +1,24 @@
+# 运行时生成的隐私数据（含真实节点信息，禁止提交）
+state.json
+runtime/
+
+# 编译产物
+*.exe
+NodePortProxy
+dist/
+
+# 内核（请自行从 v2rayN 复用，禁止打包进仓库）
+mihomo.exe
+xray.exe
+
+# 临时与调试文件
+_diag*
+*.log
+*.tmp
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

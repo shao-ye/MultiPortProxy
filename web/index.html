@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多节点端口代理</title>
+<style>
+  /* ---------- 全局样式：深色主题 ---------- */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #16181d; color: #d8dbe2; font-size: 14px;
+    padding: 16px 20px; min-width: 900px;
+  }
+  h1 { font-size: 18px; font-weight: 600; }
+  .muted { color: #7c8190; font-size: 12px; }
+
+  /* ---------- 顶部栏 ---------- */
+  .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .badge { padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge.on  { background: #143d2b; color: #4ade80; }
+  .badge.off { background: #3d1a1a; color: #f87171; }
+  .spacer { flex: 1; }
+
+  /* ---------- 按钮 ---------- */
+  button {
+    background: #2a2e38; color: #d8dbe2; border: 1px solid #3a3f4d;
+    border-radius: 6px; padding: 6px 16px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #353a47; }
+  button.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  button.primary:hover { background: #2563eb; }
+  button.danger:hover { background: #7f1d1d; border-color: #991b1b; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ---------- 卡片面板 ---------- */
+  .card {
+    background: #1d2026; border: 1px solid #2b2f3a; border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #aab0bd; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* ---------- 表单元素 ---------- */
+  input[type=text], input[type=number], textarea {
+    background: #14161b; color: #d8dbe2; border: 1px solid #3a3f4d;
+    border-radius: 6px; padding: 6px 10px; font-size: 13px;
+  }
+  input:focus, textarea:focus { outline: none; border-color: #2563eb; }
+  textarea { width: 100%; height: 88px; resize: vertical; font-family: Consolas, monospace; font-size: 12px; }
+  label { font-size: 13px; color: #aab0bd; display: flex; align-items: center; gap: 6px; }
+
+  /* ---------- 节点表格 ---------- */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #2b2f3a; }
+  th { color: #7c8190; font-size: 12px; font-weight: 600; }
+  tr:hover td { background: #22262e; }
+  td .port-input { width: 80px; }
+  .proto { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .proto.vless     { background: #1e3a5f; color: #7dd3fc; }
+  .proto.vless-xhttp { background: #16414b; color: #67e8f9; }
+  .proto.vmess     { background: #3b2d54; color: #c4b5fd; }
+  .proto.trojan    { background: #4a2a2a; color: #fda4af; }
+  .proto.ss        { background: #1f3d33; color: #6ee7b7; }
+  .proto.hysteria2 { background: #44340f; color: #fcd34d; }
+  .addr { font-family: Consolas, monospace; color: #93c5fd; cursor: pointer; }
+  .addr:hover { text-decoration: underline; }
+  .delay-ok   { color: #4ade80; }
+  .delay-bad  { color: #f87171; }
+  .err { color: #f87171; font-size: 12px; }
+
+  /* ---------- 日志面板 ---------- */
+  #logBox {
+    background: #0d0e12; border-radius: 6px; padding: 10px;
+    height: 180px; overflow-y: auto; font-family: Consolas, monospace;
+    font-size: 11px; color: #8b93a3; white-space: pre-wrap; word-break: break-all;
+  }
+
+  /* ---------- 提示条 ---------- */
+  #toast {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    background: #1d4ed8; color: #fff; padding: 8px 22px; border-radius: 8px;
+    font-size: 13px; display: none; z-index: 99; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  #toast.error { background: #b91c1c; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- 顶部栏：标题 + 运行状态 + 启停按钮 -->
+<div class="topbar">
+  <h1>多节点端口代理</h1>
+  <span id="statusBadge" class="badge off">服务未运行</span>
+  <span class="spacer"></span>
+  <button id="btnStart" class="primary" onclick="startService()">启动服务</button>
+  <button id="btnRestart" onclick="startService()" style="display:none">重启(应用修改)</button>
+  <button id="btnStop" onclick="stopService()" style="display:none">停止服务</button>
+</div>
+
+<!-- 导入面板 -->
+<div class="card">
+  <h2>导入节点（从 v2rayN 节点上右键 → 分享 → 复制分享链接到剪贴板，支持多行批量粘贴）</h2>
+  <textarea id="importBox" placeholder="vless://...&#10;vmess://...&#10;trojan://...&#10;ss://...&#10;hysteria2://..."></textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="primary" onclick="importLinks()">导入</button>
+    <span class="muted">支持 VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp（xhttp 节点由 xray 内核承载）</span>
+  </div>
+</div>
+
+<!-- 节点列表 -->
+<div class="card">
+  <div class="row" style="margin-bottom:10px">
+    <h2 style="margin:0">节点列表（<span id="nodeCount">0</span> 个）</h2>
+    <span class="spacer"></span>
+    <button onclick="autoAssign()">自动分配端口</button>
+    <button onclick="testAll()" id="btnTest">测试全部延迟</button>
+    <button class="danger" onclick="deleteSelected()">删除选中</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px"><input type="checkbox" id="chkAll" onchange="toggleAll(this)"></th>
+        <th style="width:36px">#</th>
+        <th>名称</th>
+        <th style="width:90px">协议</th>
+        <th>服务器</th>
+        <th style="width:100px">本地端口</th>
+        <th style="width:170px">代理地址(点击复制)</th>
+        <th style="width:80px">延迟</th>
+      </tr>
+    </thead>
+    <tbody id="nodeRows"></tbody>
+  </table>
+  <div id="emptyHint" class="muted" style="padding:18px;text-align:center">暂无节点，请在上方粘贴分享链接导入</div>
+</div>
+
+<!-- 设置面板 -->
+<div class="card">
+  <h2>设置</h2>
+  <div class="row">
+    <label>mihomo 路径 <input type="text" id="setCorePath" style="width:380px"></label>
+    <label>起始端口 <input type="number" id="setBasePort" style="width:90px"></label>
+    <label><input type="checkbox" id="setAllowLan"> 允许局域网连接</label>
+    <button onclick="saveSettings()">保存设置</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <label>xray 路径 <input type="text" id="setXrayPath" style="width:380px"></label>
+    <span class="muted">仅 xhttp 节点需要</span>
+  </div>
+  <div class="muted" style="margin-top:6px">内核直接复用 v2rayN 自带的 mihomo.exe / xray.exe；勾选"允许局域网"后其它电脑可通过本机 IP 使用这些代理端口</div>
+</div>
+
+<!-- 日志面板 -->
+<div class="card">
+  <h2>内核日志</h2>
+  <div id="logBox"></div>
+</div>
+
+<script>
+/* ================= 工具函数 ================= */
+
+// 显示顶部提示条，isError 为 true 时显示红色
+function toast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isError ? 'error' : '';
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// 封装 POST 请求，自动处理错误提示
+async function post(url, body) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || '请求失败');
+  return data;
+}
+
+// HTML 转义，防止节点名称中的特殊字符破坏页面
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ================= 状态刷新 ================= */
+
+let state = { nodes: [], running: false, settings: {} };
+let settingsLoaded = false; // 设置输入框只在首次加载时填充，避免覆盖用户正在输入的内容
+
+// 从后端拉取最新状态并刷新整个界面
+async function refresh() {
+  try {
+    state = await (await fetch('/api/state')).json();
+  } catch (e) { return; }
+  renderTopbar();
+  renderNodes();
+  if (!settingsLoaded) {
+    document.getElementById('setCorePath').value = state.settings.corePath || '';
+    document.getElementById('setXrayPath').value = state.settings.xrayPath || '';
+    document.getElementById('setBasePort').value = state.settings.basePort || 20001;
+    document.getElementById('setAllowLan').checked = !!state.settings.allowLan;
+    settingsLoaded = true;
+  }
+}
+
+// 刷新顶部运行状态与按钮显隐
+function renderTopbar() {
+  const badge = document.getElementById('statusBadge');
+  badge.className = 'badge ' + (state.running ? 'on' : 'off');
+  badge.textContent = state.running ? '服务运行中' : '服务未运行';
+  document.getElementById('btnStart').style.display = state.running ? 'none' : '';
+  document.getElementById('btnRestart').style.display = state.running ? '' : 'none';
+  document.getElementById('btnStop').style.display = state.running ? '' : 'none';
+}
+
+// 渲染节点表格
+function renderNodes() {
+  const nodes = state.nodes || [];
+  document.getElementById('nodeCount').textContent = nodes.length;
+  document.getElementById('emptyHint').style.display = nodes.length ? 'none' : '';
+  const host = state.settings.allowLan ? location.hostname : '127.0.0.1';
+  const rows = nodes.map((n, i) => {
+    const addr = n.port > 0 ? `127.0.0.1:${n.port}` : '';
+    let delay = '';
+    if (n.delayMs > 0) delay = `<span class="delay-ok">${n.delayMs} ms</span>`;
+    else if (n.delayMs === -1) delay = `<span class="delay-bad">失败</span>`;
+    const errLine = n.parseErr ? `<div class="err">解析失败: ${esc(n.parseErr)}</div>` : '';
+    return `<tr>
+      <td><input type="checkbox" class="rowChk" value="${n.id}"></td>
+      <td class="muted">${i + 1}</td>
+      <td>${esc(n.name)}${errLine}</td>
+      <td><span class="proto ${n.protocol}">${n.protocol || '?'}</span></td>
+      <td class="muted">${esc(n.server || '')}:${n.remote || ''}</td>
+      <td><input type="number" class="port-input" value="${n.port || ''}" placeholder="自动"
+            onchange="updatePort('${n.id}', this.value)"></td>
+      <td>${addr ? `<span class="addr" onclick="copyAddr('${addr}')">${addr}</span>` : '<span class="muted">未分配</span>'}</td>
+      <td>${delay}</td>
+    </tr>`;
+  });
+  document.getElementById('nodeRows').innerHTML = rows.join('');
+}
+
+/* ================= 操作函数 ================= */
+
+// 批量导入分享链接
+async function importLinks() {
+  const box = document.getElementById('importBox');
+  if (!box.value.trim()) { toast('请先粘贴分享链接', true); return; }
+  try {
+    const r = await post('/api/import', { links: box.value });
+    let msg = `导入成功 ${r.added} 个`;
+    if (r.skipped) msg += `，跳过重复 ${r.skipped} 个`;
+    if (r.failed && r.failed.length) msg += `，失败 ${r.failed.length} 个（${r.failed[0]}）`;
+    toast(msg, r.added === 0);
+    if (r.added > 0) box.value = '';
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 修改单个节点的本地端口
+async function updatePort(id, value) {
+  try {
+    await post('/api/update', { id, port: parseInt(value) || 0, name: '' });
+    if (state.running) toast('端口已修改，点击"重启"按钮生效');
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 自动分配端口
+async function autoAssign() {
+  try {
+    const r = await post('/api/assign');
+    toast(`已为 ${r.assigned} 个节点分配端口`);
+    if (state.running && r.assigned > 0) toast('端口已分配，点击"重启"按钮生效');
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 启动（或重启）代理服务
+async function startService() {
+  const btn = document.getElementById('btnStart');
+  btn.disabled = true;
+  try {
+    await post('/api/start');
+    toast('服务已启动');
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+  await refresh();
+}
+
+// 停止代理服务
+async function stopService() {
+  try {
+    await post('/api/stop');
+    toast('服务已停止');
+  } catch (e) { toast(e.message, true); }
+  await refresh();
+}
+
+// 测试全部节点延迟
+async function testAll() {
+  const btn = document.getElementById('btnTest');
+  btn.disabled = true; btn.textContent = '测试中...';
+  try {
+    await post('/api/test');
+    toast('测试完成');
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; btn.textContent = '测试全部延迟';
+  await refresh();
+}
+
+// 删除勾选的节点
+async function deleteSelected() {
+  const ids = [...document.querySelectorAll('.rowChk:checked')].map(c => c.value);
+  if (!ids.length) { toast('请先勾选要删除的节点', true); return; }
+  if (!confirm(`确定删除选中的 ${ids.length} 个节点？`)) return;
+  try {
+    const r = await post('/api/delete', { ids });
+    toast(`已删除 ${r.removed} 个节点`);
+    if (state.running) toast('节点已删除，点击"重启"按钮生效');
+    document.getElementById('chkAll').checked = false;
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 全选/取消全选
+function toggleAll(chk) {
+  document.querySelectorAll('.rowChk').forEach(c => c.checked = chk.checked);
+}
+
+// 复制代理地址到剪贴板
+function copyAddr(addr) {
+  navigator.clipboard.writeText(addr).then(
+    () => toast(`已复制 ${addr}（socks5 和 http 均可用）`),
+    () => toast('复制失败', true)
+  );
+}
+
+// 保存设置
+async function saveSettings() {
+  try {
+    await post('/api/settings', {
+      corePath: document.getElementById('setCorePath').value.trim(),
+      xrayPath: document.getElementById('setXrayPath').value.trim(),
+      basePort: parseInt(document.getElementById('setBasePort').value) || 20001,
+      allowLan: document.getElementById('setAllowLan').checked,
+    });
+    toast('设置已保存' + (state.running ? '，重启服务后生效' : ''));
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 拉取并展示内核日志，自动滚动到底部
+async function refreshLogs() {
+  try {
+    const r = await (await fetch('/api/logs')).json();
+    const box = document.getElementById('logBox');
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 10;
+    box.textContent = (r.logs || []).join('\n');
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  } catch (e) {}
+}
+
+/* ================= 定时轮询 ================= */
+refresh();
+refreshLogs();
+setInterval(refresh, 3000);
+setInterval(refreshLogs, 2000);
+</script>
+</body>
+</html>
