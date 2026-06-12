@@ -76,11 +76,17 @@ go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
 - **杀毒软件拦截 / 无法运行？**
   自行编译的无签名 exe 可能被 360、Windows Defender 等误报。把程序所在目录加入信任区/白名单即可。
 
-### 赞助支持
+### ❤️ 赞助支持
 
-如果这个项目帮到了你，可以请作者喝杯咖啡 ☕，感谢支持！
+开源不易，如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
 
-<img src="docs/donate-alipay.png" alt="支付宝收款码" width="240">
+[![支付宝赞赏](https://img.shields.io/badge/%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E6%94%AF%E4%BB%98%E5%AE%9D%E8%B5%9E%E8%B5%8F-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](docs/donate-alipay.png)
+
+<details>
+<summary>📱 点击展开支付宝收款码</summary>
+<br>
+<img src="docs/donate-alipay.png" alt="支付宝收款码" width="200">
+</details>
 
 ### 免责声明
 
@@ -117,9 +123,17 @@ Pure Go standard library, no third-party dependencies.
 
 Licensed under the [MIT License](LICENSE). This project only **invokes** the user's locally installed `mihomo` (GPL-3.0) and `xray` (MPL-2.0) cores via separate processes; it does **not** bundle, link, or redistribute them, and therefore is not a derivative work of either core.
 
-### Donate
+### ❤️ Donate
 
-If this project helps you, consider buying the author a coffee ☕ via the Alipay QR code above (see [赞助支持](#赞助支持)).
+If this project helps you, consider buying the author a coffee ☕
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy_me_a_coffee-Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](docs/donate-alipay.png)
+
+<details>
+<summary>📱 Alipay QR code</summary>
+<br>
+<img src="docs/donate-alipay.png" alt="Alipay QR code" width="200">
+</details>
 
 ### Disclaimer
 
