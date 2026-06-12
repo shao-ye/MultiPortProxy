@@ -22,3 +22,6 @@ _diag*
 *.swp
 .DS_Store
 Thumbs.db
+
+# 本地维护文档（不公开上传）
+发版步骤.md
