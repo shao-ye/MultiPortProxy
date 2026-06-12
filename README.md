@@ -1,12 +1,19 @@
 # MultiPortProxy · 多节点端口代理
 
-[English](#english) | [中文](#中文)
+<div align="center">
+
+**[English](#english) ｜ [简体中文](#中文)**
+
+[![项目主页](https://img.shields.io/badge/%E9%A1%B9%E7%9B%AE%E4%B8%BB%E9%A1%B5-mpp.shaoyeai.com-3b82f6?style=for-the-badge&logo=cloudflare&logoColor=white)](https://mpp.shaoyeai.com)
+[![下载](https://img.shields.io/github/v/release/shao-ye/MultiPortProxy?style=for-the-badge&label=%E4%B8%8B%E8%BD%BD&color=06b6d4&logo=windows&logoColor=white)](https://github.com/shao-ye/MultiPortProxy/releases/latest)
+[![Stars](https://img.shields.io/github/stars/shao-ye/MultiPortProxy?style=for-the-badge&color=eab308)](https://github.com/shao-ye/MultiPortProxy/stargazers)
+[![License](https://img.shields.io/github/license/shao-ye/MultiPortProxy?style=for-the-badge&color=34d399)](LICENSE)
+
+</div>
 
 一个 Windows 桌面小工具：把多个代理节点分别映射到本机的不同端口，每个端口同时提供 **socks5 和 http 代理**（mixed 模式），让指纹浏览器（AdsPower 等）的不同环境可以同时使用不同的节点出口。
 
 > 复用 [v2rayN](https://github.com/2dust/v2rayN) 自带的 `mihomo` / `xray` 内核，无需额外下载内核；纯 Go 标准库实现，零第三方依赖，编译即单文件可执行程序。
-
-🌐 **项目主页：[mpp.shaoyeai.com](https://mpp.shaoyeai.com)** ｜ 📦 **[下载最新版](https://github.com/shao-ye/MultiPortProxy/releases/latest)**
 
 ![应用界面截图](docs/screenshot.png)
 
@@ -84,8 +91,6 @@ go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
 
 [![请我喝杯咖啡](https://img.shields.io/badge/%E2%98%95_%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E6%94%AF%E4%BB%98%E5%AE%9D-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
 
-> 项目主页：**[mpp.shaoyeai.com](https://mpp.shaoyeai.com)**
-
 <details>
 <summary>📱 点击展开支付宝收款码</summary>
 <br>
@@ -132,8 +137,6 @@ Licensed under the [MIT License](LICENSE). This project only **invokes** the use
 If this project helps you, consider buying the author a coffee ☕
 
 [![Buy me a coffee](https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
-
-> Project site: **[mpp.shaoyeai.com](https://mpp.shaoyeai.com)**
 
 <details>
 <summary>📱 Alipay QR code</summary>
