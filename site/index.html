@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MultiPortProxy · 多节点端口代理</title>
 <meta name="description" content="把多个代理节点分别映射到本机的不同端口，每个端口同时提供 socks5/http，供指纹浏览器多环境同时使用不同节点。复用 v2rayN 内核，纯 Go 实现。">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔌</text></svg>">
+<link rel="icon" type="image/png" href="assets/icon.png">
 <style>
   :root {
     --bg: #0b0e14;
@@ -36,7 +36,7 @@
   }
   nav .wrap { display: flex; align-items: center; height: 62px; gap: 20px; }
   .logo { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px; }
-  .logo .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .logo .logo-icon { width: 26px; height: 26px; display: block; }
   nav .spacer { flex: 1; }
   nav a.navlink { color: var(--muted); font-size: 14px; transition: color .2s; }
   nav a.navlink:hover { color: var(--text); }
@@ -153,7 +153,7 @@
 <!-- 导航 -->
 <nav>
   <div class="wrap">
-    <span class="logo"><span class="dot"></span>MultiPortProxy</span>
+    <span class="logo"><img src="assets/icon.png" alt="M" class="logo-icon">MultiPortProxy</span>
     <span class="spacer"></span>
     <a class="navlink" href="#features">特性</a>
     <a class="navlink" href="#screenshot">截图</a>
