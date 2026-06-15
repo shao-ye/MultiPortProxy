@@ -47,15 +47,48 @@
   .btn:hover { border-color: var(--brand); transform: translateY(-1px); }
   .btn.primary { background: linear-gradient(135deg, var(--brand), var(--brand2)); border: none; color: #fff; }
   .btn.primary:hover { box-shadow: 0 8px 24px rgba(59,130,246,.35); }
-  .lang-switch {
-    display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 9px;
-    background: rgba(22,27,39,.75);
+  .language-menu { position: relative; }
+  .language-trigger {
+    display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px;
+    border: 1px solid rgba(138,147,166,.24); border-radius: 999px;
+    color: var(--text); background: rgba(22,27,39,.72); cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 700; letter-spacing: .01em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04); transition: border-color .2s, background .2s, box-shadow .2s;
   }
-  .lang-switch button {
-    border: 0; color: var(--muted); background: transparent; cursor: pointer;
-    padding: 5px 9px; border-radius: 7px; font-weight: 700; font-size: 12px;
+  .language-trigger:hover,
+  .language-menu.open .language-trigger {
+    border-color: rgba(59,130,246,.58); background: rgba(25,31,45,.95);
+    box-shadow: 0 10px 28px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
   }
-  .lang-switch button.active { color: #fff; background: rgba(59,130,246,.8); }
+  .language-trigger svg { width: 16px; height: 16px; color: var(--brand2); }
+  .language-current { min-width: 46px; text-align: left; }
+  .language-chev {
+    width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg) translateY(-2px); transition: transform .2s;
+  }
+  .language-menu.open .language-chev { transform: rotate(225deg) translateY(-1px); }
+  .language-list {
+    position: absolute; right: 0; top: calc(100% + 10px); width: 178px; padding: 8px;
+    border: 1px solid rgba(138,147,166,.18); border-radius: 14px;
+    background: rgba(17,21,31,.96); backdrop-filter: blur(16px);
+    box-shadow: 0 22px 55px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+    opacity: 0; visibility: hidden; transform: translateY(-6px) scale(.98);
+    transition: opacity .16s, transform .16s, visibility .16s; z-index: 80;
+  }
+  .language-menu.open .language-list { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  .language-option {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border: 0; border-radius: 10px; padding: 10px 10px; color: var(--text);
+    background: transparent; cursor: pointer; text-align: left; font: inherit;
+  }
+  .language-option:hover { background: rgba(59,130,246,.11); }
+  .language-option.active { background: rgba(59,130,246,.16); }
+  .language-option span:first-child { font-weight: 700; font-size: 13px; }
+  .language-option span:last-child { color: var(--muted); font-size: 12px; }
+  .language-option.active::after {
+    content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--brand2);
+    box-shadow: 0 0 0 4px rgba(6,182,212,.12); margin-left: auto;
+  }
 
   header { padding: 90px 0 70px; text-align: center; position: relative; overflow: hidden; }
   header::before {
@@ -149,6 +182,9 @@
     nav .navlink { display: none; }
     nav .wrap { gap: 10px; padding: 0 14px; }
     .btn { padding: 8px 12px; }
+    .language-current { min-width: 28px; }
+    .language-trigger { padding: 0 10px; }
+    .language-list { right: -42px; }
     .download-box { padding: 32px 20px; }
     .sponsor .qr-list { gap: 18px; }
   }
@@ -164,9 +200,23 @@
     <a class="navlink" href="#screenshot" data-i18n="navScreenshot">截图</a>
     <a class="navlink" href="#download" data-i18n="navDownload">下载</a>
     <a class="navlink" href="#sponsor" data-i18n="navSponsor">赞助</a>
-    <div class="lang-switch" aria-label="Language">
-      <button type="button" data-lang="zh-CN">中文</button>
-      <button type="button" data-lang="en">EN</button>
+    <div class="language-menu" id="languageMenu">
+      <button class="language-trigger" id="languageTrigger" type="button" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.3 3.2 5.3 3.2 9S14.1 18.7 12 21M12 3c-2.1 2.3-3.2 5.3-3.2 9s1.1 6.7 3.2 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <span class="language-current" id="languageCurrent">中文</span>
+        <span class="language-chev" aria-hidden="true"></span>
+      </button>
+      <div class="language-list" role="menu" aria-labelledby="languageTrigger">
+        <button class="language-option" type="button" data-lang="zh-CN" role="menuitem">
+          <span>简体中文</span><span>ZH</span>
+        </button>
+        <button class="language-option" type="button" data-lang="en" role="menuitem">
+          <span>English</span><span>EN</span>
+        </button>
+      </div>
     </div>
     <a class="btn" href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">GitHub</a>
   </div>
@@ -395,14 +445,39 @@ function applyLanguage(language) {
       if (attr && key && dict[key]) el.setAttribute(attr, dict[key]);
     });
   });
-  document.querySelectorAll('[data-lang]').forEach(btn => {
+  document.querySelectorAll('.language-option[data-lang]').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
   });
+  document.getElementById('languageCurrent').textContent = lang === 'en' ? 'EN' : '中文';
   localStorage.setItem('mpp-site-language', lang);
 }
 
-document.querySelectorAll('[data-lang]').forEach(btn => {
-  btn.addEventListener('click', () => applyLanguage(btn.getAttribute('data-lang')));
+const languageMenu = document.getElementById('languageMenu');
+const languageTrigger = document.getElementById('languageTrigger');
+
+function setLanguageMenuOpen(open) {
+  languageMenu.classList.toggle('open', open);
+  languageTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+languageTrigger.addEventListener('click', event => {
+  event.stopPropagation();
+  setLanguageMenuOpen(!languageMenu.classList.contains('open'));
+});
+
+document.querySelectorAll('.language-option[data-lang]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    applyLanguage(btn.getAttribute('data-lang'));
+    setLanguageMenuOpen(false);
+  });
+});
+
+document.addEventListener('click', event => {
+  if (!languageMenu.contains(event.target)) setLanguageMenuOpen(false);
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') setLanguageMenuOpen(false);
 });
 
 applyLanguage(getLanguage());
