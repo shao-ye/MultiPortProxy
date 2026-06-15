@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MultiPortProxy · 多节点端口代理</title>
-<meta name="description" content="把多个代理节点分别映射到本机的不同端口，每个端口同时提供 socks5/http，供指纹浏览器多环境同时使用不同节点。复用 v2rayN 内核，纯 Go 实现。">
+<meta name="description" content="把多个代理节点分别映射到本机不同端口，每个端口同时提供 socks5/http，适合指纹浏览器多环境同时使用不同节点。复用 v2rayN 内核，纯 Go 实现。">
 <link rel="icon" type="image/png" href="assets/icon.png">
 <style>
   :root {
@@ -28,7 +28,6 @@
   a { color: inherit; text-decoration: none; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
-  /* ---------- 导航 ---------- */
   nav {
     position: sticky; top: 0; z-index: 50;
     background: rgba(11,14,20,.8); backdrop-filter: blur(12px);
@@ -48,8 +47,16 @@
   .btn:hover { border-color: var(--brand); transform: translateY(-1px); }
   .btn.primary { background: linear-gradient(135deg, var(--brand), var(--brand2)); border: none; color: #fff; }
   .btn.primary:hover { box-shadow: 0 8px 24px rgba(59,130,246,.35); }
+  .lang-switch {
+    display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 9px;
+    background: rgba(22,27,39,.75);
+  }
+  .lang-switch button {
+    border: 0; color: var(--muted); background: transparent; cursor: pointer;
+    padding: 5px 9px; border-radius: 7px; font-weight: 700; font-size: 12px;
+  }
+  .lang-switch button.active { color: #fff; background: rgba(59,130,246,.8); }
 
-  /* ---------- Hero ---------- */
   header { padding: 90px 0 70px; text-align: center; position: relative; overflow: hidden; }
   header::before {
     content: ""; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
@@ -66,10 +73,9 @@
     background: linear-gradient(120deg, #fff 30%, #9bc2ff); -webkit-background-clip: text;
     background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 18px;
   }
-  header .sub { font-size: 18px; color: var(--muted); max-width: 620px; margin: 0 auto 34px; }
+  header .sub { font-size: 18px; color: var(--muted); max-width: 660px; margin: 0 auto 34px; }
   .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
-  /* ---------- 端口映射示意 ---------- */
   .diagram {
     margin: 56px auto 0; max-width: 720px; background: var(--bg2); border: 1px solid var(--border);
     border-radius: 14px; padding: 26px; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px;
@@ -89,12 +95,10 @@
   }
   .diagram .egress { color: var(--accent); }
 
-  /* ---------- 通用 section ---------- */
   section { padding: 70px 0; }
   .section-title { text-align: center; margin-bottom: 14px; font-size: 32px; font-weight: 700; }
   .section-desc { text-align: center; color: var(--muted); margin-bottom: 46px; }
 
-  /* ---------- 特性卡片 ---------- */
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .feature {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
@@ -105,14 +109,12 @@
   .feature h3 { font-size: 16.5px; margin-bottom: 8px; }
   .feature p { font-size: 13.5px; color: var(--muted); }
 
-  /* ---------- 截图 ---------- */
   .shot { text-align: center; }
   .shot img {
     max-width: 100%; border-radius: 14px; border: 1px solid var(--border);
     box-shadow: 0 30px 80px rgba(0,0,0,.5);
   }
 
-  /* ---------- 下载 ---------- */
   .download-box {
     background: linear-gradient(135deg, var(--bg2), var(--card)); border: 1px solid var(--border);
     border-radius: 18px; padding: 48px; text-align: center; max-width: 640px; margin: 0 auto;
@@ -120,7 +122,6 @@
   .download-box .ver { color: var(--accent); font-family: Consolas, monospace; font-size: 14px; margin-top: 14px; }
   .download-box .note { color: var(--muted); font-size: 13px; margin-top: 18px; }
 
-  /* ---------- 赞助 ---------- */
   .sponsor { text-align: center; }
   .sponsor .qr-list {
     display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 24px;
@@ -133,7 +134,6 @@
   .sponsor .qr-label { color: var(--text); font-weight: 700; margin-top: 12px; }
   .sponsor .thanks { color: var(--muted); margin-top: 20px; font-size: 14px; }
 
-  /* ---------- 免责 + footer ---------- */
   .disclaimer {
     max-width: 760px; margin: 60px auto 0; padding: 20px 24px; border-radius: 12px;
     background: var(--bg2); border: 1px solid var(--border); color: var(--muted); font-size: 13px; line-height: 1.8;
@@ -141,13 +141,14 @@
   footer { border-top: 1px solid var(--border); padding: 36px 0; text-align: center; color: var(--muted); font-size: 13px; }
   footer a { color: var(--brand2); }
 
-  /* ---------- 响应式 ---------- */
   @media (max-width: 760px) {
     h1 { font-size: 36px; }
     .features { grid-template-columns: 1fr; }
     .diagram { grid-template-columns: 1fr; gap: 14px; }
     .diagram .arrow { transform: rotate(90deg); }
     nav .navlink { display: none; }
+    nav .wrap { gap: 10px; padding: 0 14px; }
+    .btn { padding: 8px 12px; }
     .download-box { padding: 32px 20px; }
     .sponsor .qr-list { gap: 18px; }
   }
@@ -155,36 +156,37 @@
 </head>
 <body>
 
-<!-- 导航 -->
 <nav>
   <div class="wrap">
     <span class="logo"><img src="assets/icon.png" alt="M" class="logo-icon">MultiPortProxy</span>
     <span class="spacer"></span>
-    <a class="navlink" href="#features">特性</a>
-    <a class="navlink" href="#screenshot">截图</a>
-    <a class="navlink" href="#download">下载</a>
-    <a class="navlink" href="#sponsor">赞助</a>
+    <a class="navlink" href="#features" data-i18n="navFeatures">特性</a>
+    <a class="navlink" href="#screenshot" data-i18n="navScreenshot">截图</a>
+    <a class="navlink" href="#download" data-i18n="navDownload">下载</a>
+    <a class="navlink" href="#sponsor" data-i18n="navSponsor">赞助</a>
+    <div class="lang-switch" aria-label="Language">
+      <button type="button" data-lang="zh-CN">中文</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
     <a class="btn" href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">GitHub</a>
   </div>
 </nav>
 
-<!-- Hero -->
 <header>
   <div class="wrap">
-    <span class="tag">复用 v2rayN 内核 · 零第三方依赖 · 单文件运行</span>
-    <h1>多节点端口代理</h1>
-    <p class="sub">把多个代理节点分别映射到本机的不同端口，每个端口同时提供 socks5 / http，让指纹浏览器的不同环境可以<strong>同时</strong>走不同节点出口。</p>
+    <span class="tag" data-i18n="heroTag">复用 v2rayN 内核 · 零第三方依赖 · 单文件运行</span>
+    <h1 data-i18n="heroTitle">多节点端口代理</h1>
+    <p class="sub" data-i18n-html="heroSubtitle">把多个代理节点分别映射到本机不同端口，每个端口同时提供 socks5 / http，让指纹浏览器的不同环境可以<strong>同时</strong>走不同节点出口。</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/shao-ye/MultiPortProxy/releases/latest/download/MultiPortProxy.exe">⬇ 下载 Windows 版</a>
-      <a class="btn" href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">★ GitHub 开源</a>
+      <a class="btn primary" href="https://github.com/shao-ye/MultiPortProxy/releases/latest/download/MultiPortProxy.exe" data-i18n="downloadWindows">下载 Windows 版</a>
+      <a class="btn" href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener" data-i18n="openSource">GitHub 开源</a>
     </div>
 
-    <!-- 端口映射示意图 -->
     <div class="diagram">
       <div class="col">
-        <div class="node">指纹浏览器环境 1</div>
-        <div class="node">指纹浏览器环境 2</div>
-        <div class="node">指纹浏览器环境 3</div>
+        <div class="node" data-i18n="env1">指纹浏览器环境 1</div>
+        <div class="node" data-i18n="env2">指纹浏览器环境 2</div>
+        <div class="node" data-i18n="env3">指纹浏览器环境 3</div>
       </div>
       <div class="arrow">→</div>
       <div class="col">
@@ -194,78 +196,72 @@
       </div>
       <div class="arrow">→</div>
       <div class="col">
-        <div class="core">mihomo / xray<br>内核</div>
-        <div class="node egress">节点 1 · 2 · 3<br>各自独立出口</div>
+        <div class="core" data-i18n-html="coreBox">mihomo / xray<br>内核</div>
+        <div class="node egress" data-i18n-html="egressBox">节点 1 · 2 · 3<br>各自独立出口</div>
       </div>
     </div>
   </div>
 </header>
 
-<!-- 特性 -->
 <section id="features">
   <div class="wrap">
-    <h2 class="section-title">核心特性</h2>
-    <p class="section-desc">为「指纹浏览器多环境、每个环境一个独立节点」而生</p>
+    <h2 class="section-title" data-i18n="featuresTitle">核心特性</h2>
+    <p class="section-desc" data-i18n="featuresDesc">为“指纹浏览器多环境、每个环境一个独立节点”而生</p>
     <div class="features">
-      <div class="feature"><div class="icon">🔌</div><h3>多端口映射</h3><p>每个节点独占一个本地端口，同一端口同时支持 socks5 与 http（mixed），互不干扰。</p></div>
-      <div class="feature"><div class="icon">📋</div><h3>批量导入</h3><p>直接粘贴 v2rayN 的节点分享链接，支持多行一次导入，自动分配端口。</p></div>
-      <div class="feature"><div class="icon">🧩</div><h3>多协议支持</h3><p>VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp 全覆盖。</p></div>
-      <div class="feature"><div class="icon">⚙️</div><h3>双内核架构</h3><p>常规协议走 mihomo；xhttp 节点自动改由 xray 承载并桥接，无需手动配置。</p></div>
-      <div class="feature"><div class="icon">⚡</div><h3>延迟测试</h3><p>一键测试每个端口的真实连通性与延迟，节点状态一目了然。</p></div>
-      <div class="feature"><div class="icon">♻️</div><h3>复用 v2rayN 内核</h3><p>不打包内核，自动探测 v2rayN 自带的 mihomo / xray，与 v2rayN 共存不冲突。</p></div>
+      <div class="feature"><div class="icon">🔀</div><h3 data-i18n="featurePortsTitle">多端口映射</h3><p data-i18n="featurePortsText">每个节点独占一个本地端口，同一端口同时支持 socks5 和 http，互不干扰。</p></div>
+      <div class="feature"><div class="icon">📋</div><h3 data-i18n="featureImportTitle">批量导入</h3><p data-i18n="featureImportText">直接粘贴 v2rayN 的节点分享链接，支持多行一次导入，自动分配端口。</p></div>
+      <div class="feature"><div class="icon">🧩</div><h3 data-i18n="featureProtocolTitle">多协议支持</h3><p data-i18n="featureProtocolText">覆盖 VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp。</p></div>
+      <div class="feature"><div class="icon">⚙️</div><h3 data-i18n="featureCoresTitle">双内核架构</h3><p data-i18n="featureCoresText">常规协议走 mihomo，xhttp 节点自动改由 xray 承载并桥接，无需手动配置。</p></div>
+      <div class="feature"><div class="icon">⚡</div><h3 data-i18n="featureLatencyTitle">延迟测试</h3><p data-i18n="featureLatencyText">一键测试每个端口的真实连通性与延迟，节点状态一目了然。</p></div>
+      <div class="feature"><div class="icon">♻️</div><h3 data-i18n="featureReuseTitle">复用 v2rayN 内核</h3><p data-i18n="featureReuseText">不打包内核，自动探测 v2rayN 自带的 mihomo / xray，与 v2rayN 共存不冲突。</p></div>
     </div>
   </div>
 </section>
 
-<!-- 截图 -->
 <section id="screenshot" style="background:var(--bg2);">
   <div class="wrap shot">
-    <h2 class="section-title">界面预览</h2>
-    <p class="section-desc">内嵌网页界面，以独立窗口弹出，体验接近原生桌面应用</p>
-    <img src="assets/screenshot.png" alt="MultiPortProxy 应用界面">
+    <h2 class="section-title" data-i18n="screenshotTitle">界面预览</h2>
+    <p class="section-desc" data-i18n="screenshotDesc">内嵌网页界面，以独立窗口弹出，体验接近原生桌面应用</p>
+    <img src="assets/screenshot.png" alt="MultiPortProxy 应用界面" data-i18n-attr="alt:screenshotAlt">
   </div>
 </section>
 
-<!-- 下载 -->
 <section id="download">
   <div class="wrap">
     <div class="download-box">
-      <h2 class="section-title" style="margin-bottom:10px;">立即下载</h2>
-      <p class="section-desc" style="margin-bottom:26px;">单文件可执行程序，双击即用，无需安装</p>
-      <a class="btn primary" style="font-size:15px;padding:13px 28px;" href="https://github.com/shao-ye/MultiPortProxy/releases/latest/download/MultiPortProxy.exe">⬇ MultiPortProxy.exe（Windows 64 位）</a>
-      <div class="ver">最新版本见 <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a></div>
-      <p class="note">需自备 mihomo / xray 内核（可直接复用 v2rayN 安装目录下的）</p>
+      <h2 class="section-title" style="margin-bottom:10px;" data-i18n="downloadTitle">立即下载</h2>
+      <p class="section-desc" style="margin-bottom:26px;" data-i18n="downloadDesc">单文件可执行程序，双击即用，无需安装</p>
+      <a class="btn primary" style="font-size:15px;padding:13px 28px;" href="https://github.com/shao-ye/MultiPortProxy/releases/latest/download/MultiPortProxy.exe" data-i18n="downloadExe">MultiPortProxy.exe（Windows 64 位）</a>
+      <div class="ver" data-i18n-html="latestVersion">最新版本见 <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a></div>
+      <p class="note" data-i18n="downloadNote">需自备 mihomo / xray 内核（可直接复用 v2rayN 安装目录下的）</p>
     </div>
   </div>
 </section>
 
-<!-- 赞助 -->
 <section id="sponsor" style="background:var(--bg2);">
   <div class="wrap sponsor">
-    <h2 class="section-title">❤️ 赞助支持</h2>
-    <p class="section-desc">开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡 ☕</p>
+    <h2 class="section-title" data-i18n="sponsorTitle">赞助支持</h2>
+    <p class="section-desc" data-i18n="sponsorDesc">开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡。</p>
     <div class="qr-list">
       <div>
-        <div class="qr"><img src="assets/donate-wechat.jpg" alt="微信赞赏码"></div>
-        <div class="qr-label">微信赞赏</div>
+        <div class="qr"><img src="assets/donate-wechat.jpg" alt="微信赞赏码" data-i18n-attr="alt:wechatAlt"></div>
+        <div class="qr-label" data-i18n="wechatPay">微信赞赏</div>
       </div>
       <div>
-        <div class="qr"><img src="assets/donate-alipay.png" alt="支付宝收款码"></div>
-        <div class="qr-label">支付宝</div>
+        <div class="qr"><img src="assets/donate-alipay.png" alt="支付宝收款码" data-i18n-attr="alt:alipayAlt"></div>
+        <div class="qr-label" data-i18n="alipay">支付宝</div>
       </div>
     </div>
-    <p class="thanks">微信或支付宝扫一扫 · 感谢每一份支持 🙏</p>
+    <p class="thanks" data-i18n="thanks">微信或支付宝扫一扫 · 感谢每一份支持</p>
   </div>
 </section>
 
-<!-- 免责声明 -->
 <div class="wrap">
-  <div class="disclaimer">
+  <div class="disclaimer" data-i18n-html="disclaimer">
     <strong>免责声明：</strong>本工具仅用于在本机对你自己拥有合法使用权的代理节点做端口管理与分发，方便多环境调试等技术用途。使用者须遵守所在国家和地区的法律法规，并对自己的使用行为负全部责任。作者不对任何滥用行为承担责任。
   </div>
 </div>
 
-<!-- Footer -->
 <footer>
   <div class="wrap">
     MultiPortProxy · MIT License ·
@@ -273,5 +269,143 @@
   </div>
 </footer>
 
+<script>
+const translations = {
+  'zh-CN': {
+    pageTitle: 'MultiPortProxy · 多节点端口代理',
+    metaDescription: '把多个代理节点分别映射到本机不同端口，每个端口同时提供 socks5/http，适合指纹浏览器多环境同时使用不同节点。复用 v2rayN 内核，纯 Go 实现。',
+    navFeatures: '特性',
+    navScreenshot: '截图',
+    navDownload: '下载',
+    navSponsor: '赞助',
+    heroTag: '复用 v2rayN 内核 · 零第三方依赖 · 单文件运行',
+    heroTitle: '多节点端口代理',
+    heroSubtitle: '把多个代理节点分别映射到本机不同端口，每个端口同时提供 socks5 / http，让指纹浏览器的不同环境可以<strong>同时</strong>走不同节点出口。',
+    downloadWindows: '下载 Windows 版',
+    openSource: 'GitHub 开源',
+    env1: '指纹浏览器环境 1',
+    env2: '指纹浏览器环境 2',
+    env3: '指纹浏览器环境 3',
+    coreBox: 'mihomo / xray<br>内核',
+    egressBox: '节点 1 · 2 · 3<br>各自独立出口',
+    featuresTitle: '核心特性',
+    featuresDesc: '为“指纹浏览器多环境、每个环境一个独立节点”而生',
+    featurePortsTitle: '多端口映射',
+    featurePortsText: '每个节点独占一个本地端口，同一端口同时支持 socks5 和 http，互不干扰。',
+    featureImportTitle: '批量导入',
+    featureImportText: '直接粘贴 v2rayN 的节点分享链接，支持多行一次导入，自动分配端口。',
+    featureProtocolTitle: '多协议支持',
+    featureProtocolText: '覆盖 VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp。',
+    featureCoresTitle: '双内核架构',
+    featureCoresText: '常规协议走 mihomo，xhttp 节点自动改由 xray 承载并桥接，无需手动配置。',
+    featureLatencyTitle: '延迟测试',
+    featureLatencyText: '一键测试每个端口的真实连通性与延迟，节点状态一目了然。',
+    featureReuseTitle: '复用 v2rayN 内核',
+    featureReuseText: '不打包内核，自动探测 v2rayN 自带的 mihomo / xray，与 v2rayN 共存不冲突。',
+    screenshotTitle: '界面预览',
+    screenshotDesc: '内嵌网页界面，以独立窗口弹出，体验接近原生桌面应用',
+    screenshotAlt: 'MultiPortProxy 应用界面',
+    downloadTitle: '立即下载',
+    downloadDesc: '单文件可执行程序，双击即用，无需安装',
+    downloadExe: 'MultiPortProxy.exe（Windows 64 位）',
+    latestVersion: '最新版本见 <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a>',
+    downloadNote: '需自备 mihomo / xray 内核（可直接复用 v2rayN 安装目录下的）',
+    sponsorTitle: '赞助支持',
+    sponsorDesc: '开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡。',
+    wechatAlt: '微信赞赏码',
+    wechatPay: '微信赞赏',
+    alipayAlt: '支付宝收款码',
+    alipay: '支付宝',
+    thanks: '微信或支付宝扫一扫 · 感谢每一份支持',
+    disclaimer: '<strong>免责声明：</strong>本工具仅用于在本机对你自己拥有合法使用权的代理节点做端口管理与分发，方便多环境调试等技术用途。使用者须遵守所在国家和地区的法律法规，并对自己的使用行为负全部责任。作者不对任何滥用行为承担责任。'
+  },
+  en: {
+    pageTitle: 'MultiPortProxy · Multi-node Port Proxy',
+    metaDescription: 'Map multiple proxy nodes to separate local ports. Each port supports socks5/http, ideal for multi-profile antidetect browser workflows. Reuses v2rayN cores and is built in pure Go.',
+    navFeatures: 'Features',
+    navScreenshot: 'Screenshot',
+    navDownload: 'Download',
+    navSponsor: 'Sponsor',
+    heroTag: 'Reuse v2rayN cores · Zero third-party dependencies · Single executable',
+    heroTitle: 'Multi-node Port Proxy',
+    heroSubtitle: 'Map multiple proxy nodes to different local ports. Each port serves socks5 / http so separate browser profiles can use different exits <strong>at the same time</strong>.',
+    downloadWindows: 'Download for Windows',
+    openSource: 'Open source on GitHub',
+    env1: 'Browser profile 1',
+    env2: 'Browser profile 2',
+    env3: 'Browser profile 3',
+    coreBox: 'mihomo / xray<br>core',
+    egressBox: 'Node 1 · 2 · 3<br>independent exits',
+    featuresTitle: 'Core Features',
+    featuresDesc: 'Built for multi-profile browsers where each profile needs its own proxy node',
+    featurePortsTitle: 'Multiple local ports',
+    featurePortsText: 'Each node gets its own local port. The same port supports both socks5 and http without interference.',
+    featureImportTitle: 'Bulk import',
+    featureImportText: 'Paste v2rayN share links directly. Import many lines at once and assign ports automatically.',
+    featureProtocolTitle: 'Protocol coverage',
+    featureProtocolText: 'Supports VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp.',
+    featureCoresTitle: 'Dual-core design',
+    featureCoresText: 'Regular protocols use mihomo. xhttp nodes are automatically handled by xray and bridged back.',
+    featureLatencyTitle: 'Latency testing',
+    featureLatencyText: 'Test real connectivity and latency for every local port in one click.',
+    featureReuseTitle: 'Reuse v2rayN cores',
+    featureReuseText: 'No bundled cores. The app auto-detects mihomo / xray from v2rayN and coexists cleanly.',
+    screenshotTitle: 'Interface Preview',
+    screenshotDesc: 'Embedded web UI opened in an app-style desktop window.',
+    screenshotAlt: 'MultiPortProxy application interface',
+    downloadTitle: 'Download',
+    downloadDesc: 'Single executable. No installer required.',
+    downloadExe: 'MultiPortProxy.exe (Windows 64-bit)',
+    latestVersion: 'Latest version on <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a>',
+    downloadNote: 'Requires local mihomo / xray cores. You can reuse the ones installed with v2rayN.',
+    sponsorTitle: 'Sponsor',
+    sponsorDesc: 'Open source takes time. If this project helps you, a small coffee is appreciated.',
+    wechatAlt: 'WeChat reward QR code',
+    wechatPay: 'WeChat',
+    alipayAlt: 'Alipay payment QR code',
+    alipay: 'Alipay',
+    thanks: 'Scan with WeChat or Alipay · Thank you for the support',
+    disclaimer: '<strong>Disclaimer:</strong> This tool is only for managing and distributing proxy nodes that you are legally entitled to use on your own machine, for technical workflows such as multi-profile testing. You are responsible for complying with applicable laws and regulations. The author assumes no liability for misuse.'
+  }
+};
+
+function getLanguage() {
+  const saved = localStorage.getItem('mpp-site-language');
+  if (saved === 'zh-CN' || saved === 'en') return saved;
+  return (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+}
+
+function applyLanguage(language) {
+  const lang = language === 'en' ? 'en' : 'zh-CN';
+  const dict = translations[lang];
+  document.documentElement.lang = lang;
+  document.title = dict.pageTitle;
+  document.querySelector('meta[name="description"]').setAttribute('content', dict.metaDescription);
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key]) el.textContent = dict[key];
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    if (dict[key]) el.innerHTML = dict[key];
+  });
+  document.querySelectorAll('[data-i18n-attr]').forEach(el => {
+    el.getAttribute('data-i18n-attr').split(',').forEach(pair => {
+      const [attr, key] = pair.split(':');
+      if (attr && key && dict[key]) el.setAttribute(attr, dict[key]);
+    });
+  });
+  document.querySelectorAll('[data-lang]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+  });
+  localStorage.setItem('mpp-site-language', lang);
+}
+
+document.querySelectorAll('[data-lang]').forEach(btn => {
+  btn.addEventListener('click', () => applyLanguage(btn.getAttribute('data-lang')));
+});
+
+applyLanguage(getLanguage());
+</script>
 </body>
 </html>
