@@ -89,12 +89,15 @@ go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
 
 开源不易，如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
 
-[![请我喝杯咖啡](https://img.shields.io/badge/%E2%98%95_%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E6%94%AF%E4%BB%98%E5%AE%9D-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
+[![请我喝杯咖啡](https://img.shields.io/badge/%E2%98%95_%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E5%BE%AE%E4%BF%A1%20%2F%20%E6%94%AF%E4%BB%98%E5%AE%9D-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
 
 <details>
-<summary>📱 点击展开支付宝收款码</summary>
+<summary>📱 点击展开微信赞赏码 / 支付宝收款码</summary>
 <br>
-<img src="docs/donate-alipay.png" alt="支付宝收款码" width="200">
+<p>
+  <img src="docs/donate-wechat.jpg" alt="微信赞赏码" width="200">
+  <img src="docs/donate-alipay.png" alt="支付宝收款码" width="200">
+</p>
 </details>
 
 ### 免责声明
@@ -136,12 +139,15 @@ Licensed under the [MIT License](LICENSE). This project only **invokes** the use
 
 If this project helps you, consider buying the author a coffee ☕
 
-[![Buy me a coffee](https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
+[![Buy me a coffee](https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-WeChat%20%2F%20Alipay-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
 
 <details>
-<summary>📱 Alipay QR code</summary>
+<summary>📱 WeChat reward code / Alipay QR code</summary>
 <br>
-<img src="docs/donate-alipay.png" alt="Alipay QR code" width="200">
+<p>
+  <img src="docs/donate-wechat.jpg" alt="WeChat reward code" width="200">
+  <img src="docs/donate-alipay.png" alt="Alipay QR code" width="200">
+</p>
 </details>
 
 ### Disclaimer

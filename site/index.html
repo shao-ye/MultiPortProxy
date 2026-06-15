@@ -122,11 +122,15 @@
 
   /* ---------- 赞助 ---------- */
   .sponsor { text-align: center; }
+  .sponsor .qr-list {
+    display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 24px;
+  }
   .sponsor .qr {
-    display: inline-block; background: #fff; padding: 14px; border-radius: 14px; margin-top: 24px;
+    background: #fff; padding: 14px; border-radius: 14px;
     box-shadow: 0 20px 50px rgba(0,0,0,.4);
   }
-  .sponsor .qr img { width: 230px; display: block; border-radius: 6px; }
+  .sponsor .qr img { width: 230px; height: 230px; display: block; object-fit: contain; border-radius: 6px; }
+  .sponsor .qr-label { color: var(--text); font-weight: 700; margin-top: 12px; }
   .sponsor .thanks { color: var(--muted); margin-top: 20px; font-size: 14px; }
 
   /* ---------- 免责 + footer ---------- */
@@ -145,6 +149,7 @@
     .diagram .arrow { transform: rotate(90deg); }
     nav .navlink { display: none; }
     .download-box { padding: 32px 20px; }
+    .sponsor .qr-list { gap: 18px; }
   }
 </style>
 </head>
@@ -239,8 +244,17 @@
   <div class="wrap sponsor">
     <h2 class="section-title">❤️ 赞助支持</h2>
     <p class="section-desc">开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡 ☕</p>
-    <div class="qr"><img src="assets/donate-alipay.png" alt="支付宝收款码"></div>
-    <p class="thanks">打开支付宝扫一扫 · 感谢每一份支持 🙏</p>
+    <div class="qr-list">
+      <div>
+        <div class="qr"><img src="assets/donate-wechat.jpg" alt="微信赞赏码"></div>
+        <div class="qr-label">微信赞赏</div>
+      </div>
+      <div>
+        <div class="qr"><img src="assets/donate-alipay.png" alt="支付宝收款码"></div>
+        <div class="qr-label">支付宝</div>
+      </div>
+    </div>
+    <p class="thanks">微信或支付宝扫一扫 · 感谢每一份支持 🙏</p>
   </div>
 </section>
 
