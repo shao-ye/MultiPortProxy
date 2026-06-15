@@ -236,9 +236,10 @@ func showCloseTip() {
 	trayNID.uFlags = nifMessage | nifIcon | nifTip
 }
 
-// trayExit 彻底退出：移除托盘图标、停止内核、结束进程
+// trayExit 彻底退出：移除托盘图标、关闭界面窗口、停止内核、结束进程
 func trayExit() {
 	procShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&trayNID)))
+	closeAppWindows() // Edge --app 窗口是独立进程，需主动关闭，否则会残留空壳窗口
 	core.Stop()
 	os.Exit(0)
 }
