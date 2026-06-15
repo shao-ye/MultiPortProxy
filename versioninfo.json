@@ -1,7 +1,7 @@
 {
   "FixedFileInfo": {
-    "FileVersion": { "Major": 1, "Minor": 0, "Patch": 4, "Build": 0 },
-    "ProductVersion": { "Major": 1, "Minor": 0, "Patch": 4, "Build": 0 },
+    "FileVersion": { "Major": 1, "Minor": 0, "Patch": 5, "Build": 0 },
+    "ProductVersion": { "Major": 1, "Minor": 0, "Patch": 5, "Build": 0 },
     "FileFlagsMask": "3f",
     "FileFlags": "00",
     "FileOS": "040004",
@@ -12,8 +12,8 @@
     "CompanyName": "shaoye519",
     "ProductName": "MultiPortProxy",
     "FileDescription": "多节点端口代理 - 把多个代理节点映射到本机不同端口",
-    "FileVersion": "1.0.4.0",
-    "ProductVersion": "1.0.4.0",
+    "FileVersion": "1.0.5.0",
+    "ProductVersion": "1.0.5.0",
     "LegalCopyright": "Copyright (c) 2026 shaoye519. MIT License.",
     "OriginalFilename": "NodePortProxy.exe",
     "InternalName": "NodePortProxy"

@@ -72,10 +72,17 @@ func main() {
 	}
 
 	fmt.Println("多节点端口代理已启动:", url)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		fmt.Println("服务启动失败:", err)
-		os.Exit(1)
-	}
+	// HTTP 服务放到后台 goroutine，主线程留给系统托盘的消息循环
+	go func() {
+		if err := http.ListenAndServe(addr, mux); err != nil {
+			fmt.Println("服务启动失败:", err)
+			os.Exit(1)
+		}
+	}()
+
+	// 进入系统托盘消息循环（阻塞）。关闭界面窗口后程序最小化到托盘继续运行，
+	// 仅当通过托盘菜单「完全退出」时才真正结束进程。
+	runTray(url)
 }
 
 // isSelfRunning 检查指定端口上是否已经运行着本应用（通过 /api/ping 的标识判断）

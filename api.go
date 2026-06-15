@@ -28,6 +28,13 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 		jsonResp(w, map[string]string{"app": "NodePortProxy"})
 	})
 
+	// 界面窗口关闭信标：网页在 pagehide 时通过 sendBeacon 通知，
+	// 由托盘逻辑在首次关闭时弹出"已最小化到托盘"气泡提示
+	mux.HandleFunc("/api/ui-closed", func(w http.ResponseWriter, r *http.Request) {
+		trayOnUIClose()
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	// 获取完整状态：设置、节点列表、运行状态
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		st.mu.Lock()

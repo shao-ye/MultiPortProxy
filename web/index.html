@@ -391,6 +391,14 @@ refresh();
 refreshLogs();
 setInterval(refresh, 3000);
 setInterval(refreshLogs, 2000);
+
+/* ================= 窗口关闭信标 =================
+   界面是 Edge --app 窗口，点右上角 X 只会关掉窗口，后台 Go 进程仍在运行。
+   关闭前通过 sendBeacon 通知后端，由后端在首次关闭时弹出"已最小化到托盘"气泡提示。
+   用 pagehide 而非 unload：Chromium 下 pagehide 更可靠，且 sendBeacon 能在卸载阶段送达。 */
+window.addEventListener('pagehide', function () {
+  try { navigator.sendBeacon('/api/ui-closed'); } catch (e) {}
+});
 </script>
 </body>
 </html>
