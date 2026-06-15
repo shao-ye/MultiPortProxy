@@ -40,19 +40,41 @@ type AppState struct {
 	Settings  Settings `json:"settings"`
 	Nodes     []*Node  `json:"nodes"`
 	AutoStart bool     `json:"autoStart"` // 上次退出时服务是否在运行，应用启动时据此自动恢复服务
-	file      string   // 持久化文件路径
+	// CloseAction 决定点击界面窗口关闭按钮(X)时的行为：
+	// "ask"=每次询问（默认）, "exit"=直接完全退出, "tray"=最小化到托盘。空串按 "ask" 处理。
+	CloseAction string `json:"closeAction"`
+	file        string // 持久化文件路径
 }
 
 // persistedState 是写入磁盘的精简结构（节点只保留必要字段）
 type persistedState struct {
-	Settings  Settings `json:"settings"`
-	AutoStart bool     `json:"autoStart"`
-	Nodes     []struct {
+	Settings    Settings `json:"settings"`
+	AutoStart   bool     `json:"autoStart"`
+	CloseAction string   `json:"closeAction"`
+	Nodes       []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 		Link string `json:"link"`
 		Port int    `json:"port"`
 	} `json:"nodes"`
+}
+
+// GetCloseAction 返回关闭按钮行为；未设置时默认 "ask"（每次询问）
+func (st *AppState) GetCloseAction() string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.CloseAction == "" {
+		return "ask"
+	}
+	return st.CloseAction
+}
+
+// SetCloseAction 设置关闭按钮行为并立即持久化
+func (st *AppState) SetCloseAction(action string) {
+	st.mu.Lock()
+	st.CloseAction = action
+	_ = st.saveLocked()
+	st.mu.Unlock()
 }
 
 // exeDir 返回当前可执行文件所在目录；获取失败时退回工作目录
@@ -130,6 +152,7 @@ func LoadState() *AppState {
 		st.Settings = ps.Settings
 	}
 	st.AutoStart = ps.AutoStart
+	st.CloseAction = ps.CloseAction
 	// 如果保存的内核路径已失效，重新自动探测
 	if _, err := os.Stat(st.Settings.CorePath); err != nil {
 		st.Settings.CorePath = detectCorePath()
@@ -160,6 +183,7 @@ func (st *AppState) saveLocked() error {
 	var ps persistedState
 	ps.Settings = st.Settings
 	ps.AutoStart = st.AutoStart
+	ps.CloseAction = st.CloseAction
 	for _, n := range st.Nodes {
 		ps.Nodes = append(ps.Nodes, struct {
 			ID   string `json:"id"`

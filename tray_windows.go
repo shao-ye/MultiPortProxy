@@ -23,23 +23,24 @@ var appIcoData []byte
 var (
 	user32  = syscall.NewLazyDLL("user32.dll")
 	shell32 = syscall.NewLazyDLL("shell32.dll")
+	gdi32   = syscall.NewLazyDLL("gdi32.dll")
 
-	procGetModuleHandleW   = kernel32.NewProc("GetModuleHandleW")
-	procRegisterClassExW   = user32.NewProc("RegisterClassExW")
-	procCreateWindowExW    = user32.NewProc("CreateWindowExW")
-	procDefWindowProcW     = user32.NewProc("DefWindowProcW")
-	procGetMessageW        = user32.NewProc("GetMessageW")
-	procTranslateMessage   = user32.NewProc("TranslateMessage")
-	procDispatchMessageW   = user32.NewProc("DispatchMessageW")
-	procPostQuitMessage    = user32.NewProc("PostQuitMessage")
-	procPostMessageW       = user32.NewProc("PostMessageW")
-	procLoadImageW         = user32.NewProc("LoadImageW")
-	procLoadIconW          = user32.NewProc("LoadIconW")
-	procCreatePopupMenu    = user32.NewProc("CreatePopupMenu")
-	procAppendMenuW        = user32.NewProc("AppendMenuW")
-	procTrackPopupMenu     = user32.NewProc("TrackPopupMenu")
-	procDestroyMenu        = user32.NewProc("DestroyMenu")
-	procGetCursorPos       = user32.NewProc("GetCursorPos")
+	procGetModuleHandleW    = kernel32.NewProc("GetModuleHandleW")
+	procRegisterClassExW    = user32.NewProc("RegisterClassExW")
+	procCreateWindowExW     = user32.NewProc("CreateWindowExW")
+	procDefWindowProcW      = user32.NewProc("DefWindowProcW")
+	procGetMessageW         = user32.NewProc("GetMessageW")
+	procTranslateMessage    = user32.NewProc("TranslateMessage")
+	procDispatchMessageW    = user32.NewProc("DispatchMessageW")
+	procPostQuitMessage     = user32.NewProc("PostQuitMessage")
+	procPostMessageW        = user32.NewProc("PostMessageW")
+	procLoadImageW          = user32.NewProc("LoadImageW")
+	procLoadIconW           = user32.NewProc("LoadIconW")
+	procCreatePopupMenu     = user32.NewProc("CreatePopupMenu")
+	procAppendMenuW         = user32.NewProc("AppendMenuW")
+	procTrackPopupMenu      = user32.NewProc("TrackPopupMenu")
+	procDestroyMenu         = user32.NewProc("DestroyMenu")
+	procGetCursorPos        = user32.NewProc("GetCursorPos")
 	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
@@ -47,19 +48,60 @@ var (
 	procEnumWindows    = user32.NewProc("EnumWindows")
 	procGetWindowTextW = user32.NewProc("GetWindowTextW")
 	procGetClassNameW  = user32.NewProc("GetClassNameW")
+
+	// 自定义对话框（关闭询问 / 设置）所需
+	procDestroyWindow    = user32.NewProc("DestroyWindow")
+	procSendMessageW     = user32.NewProc("SendMessageW")
+	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
+	procShowWindow       = user32.NewProc("ShowWindow")
+	procGetStockObject   = gdi32.NewProc("GetStockObject")
 )
 
 // ---------- 常量 ----------
 const (
-	wmApp            = 0x8000
-	wmTrayCallback   = wmApp + 1 // 托盘图标的鼠标事件回调消息
-	wmShowCloseTip   = wmApp + 2 // 自定义消息：在托盘线程弹出"已最小化"气泡
+	wmApp          = 0x8000
+	wmTrayCallback = wmApp + 1 // 托盘图标的鼠标事件回调消息
+	wmShowCloseTip = wmApp + 2 // 自定义消息：在托盘线程弹出"已最小化"气泡
+	wmAskClose     = wmApp + 3 // 自定义消息：在托盘线程弹出"关闭方式"询问对话框
 
 	wmClose         = 0x0010
+	wmCommand       = 0x0111
+	wmSetFont       = 0x0030
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
 	wmRButtonUp     = 0x0205
 	wmDestroy       = 0x0002
+
+	bmGetCheck = 0x00F0
+	bstChecked = 1
+
+	// 窗口/控件样式
+	wsChild           = 0x40000000
+	wsVisible         = 0x10000000
+	wsTabStop         = 0x00010000
+	wsCaption         = 0x00C00000
+	wsSysMenu         = 0x00080000
+	wsExDlgModalFrame = 0x00000001
+	wsExTopmost       = 0x00000008
+	wsExToolWindow    = 0x00000080
+	bsPushButton      = 0x00000000
+	bsDefPushButton   = 0x00000001
+	bsAutoCheckBox    = 0x00000003
+	ssLeft            = 0x00000000
+
+	defaultGuiFont = 17
+	smCxScreen     = 0
+	smCyScreen     = 1
+	swShow         = 5
+	swRestore      = 9
+
+	// 对话框控件 ID
+	idExitBtn  = 101 // 关闭询问：完全退出
+	idTrayBtn  = 102 // 关闭询问：最小化到托盘
+	idRemember = 103 // 关闭询问：记住选择 勾选框
+	idSetAsk   = 201 // 设置：每次都询问
+	idSetExit  = 202 // 设置：直接完全退出
+	idSetTray  = 203 // 设置：最小化到托盘
 
 	// appWindowTitle 是 Edge --app 界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
 	appWindowTitle = "多节点端口代理"
@@ -83,12 +125,13 @@ const (
 
 	idiApplication = 32512
 
-	mfString        = 0x0000
-	tpmReturnCmd    = 0x0100
-	tpmRightButton  = 0x0002
+	mfString       = 0x0000
+	tpmReturnCmd   = 0x0100
+	tpmRightButton = 0x0002
 
-	menuShow = 1 // 托盘右键菜单：显示界面
-	menuExit = 2 // 托盘右键菜单：完全退出
+	menuShow     = 1 // 托盘右键菜单：显示界面
+	menuSettings = 3 // 托盘右键菜单：设置（关闭按钮行为）
+	menuExit     = 2 // 托盘右键菜单：完全退出
 )
 
 // ---------- Win32 结构体（64 位布局） ----------
@@ -144,8 +187,11 @@ var (
 	trayHwnd     syscall.Handle
 	trayNID      notifyIconData
 	trayURL      string
+	traySt       *AppState // 全局应用状态，托盘读写关闭行为设置
 	closeTipOnce sync.Once
 	wndProcCB    = syscall.NewCallback(wndProc)
+
+	dialogShowing bool // 正在显示关闭询问/设置对话框时为 true，避免重复弹出
 )
 
 // utf16Ptr 把 Go 字符串转成以 NUL 结尾的 UTF-16 指针（出错时返回空字符串指针）
@@ -191,6 +237,9 @@ func loadAppIcon(hInstance uintptr) syscall.Handle {
 func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	switch msg {
 	case wmTrayCallback:
+		if dialogShowing {
+			return 0 // 对话框打开期间不响应托盘交互
+		}
 		// lParam 低位是具体的鼠标事件
 		switch uint32(lparam) {
 		case wmLButtonUp, wmLButtonDblClk:
@@ -202,6 +251,23 @@ func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	case wmShowCloseTip:
 		showCloseTip()
 		return 0
+	case wmAskClose:
+		// 关闭界面窗口时弹出"完全退出/最小化到托盘"询问对话框
+		if dialogShowing {
+			return 0
+		}
+		dialogShowing = true
+		action, remember := showCloseDialog()
+		dialogShowing = false
+		if remember && (action == "exit" || action == "tray") {
+			traySt.SetCloseAction(action) // 勾选"记住"则持久化此选择
+		}
+		if action == "exit" {
+			trayExit()
+		} else {
+			closeTipOnce.Do(showCloseTip) // 最小化到托盘：首次给个气泡提示
+		}
+		return 0
 	case wmDestroy:
 		procPostQuitMessage.Call(0)
 		return 0
@@ -210,10 +276,11 @@ func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	return r
 }
 
-// showTrayMenu 在鼠标位置弹出托盘右键菜单（显示界面 / 完全退出）
+// showTrayMenu 在鼠标位置弹出托盘右键菜单（显示界面 / 设置 / 完全退出）
 func showTrayMenu(hwnd uintptr) {
 	hmenu, _, _ := procCreatePopupMenu.Call()
 	procAppendMenuW.Call(hmenu, mfString, menuShow, uintptr(unsafe.Pointer(utf16Ptr("显示界面"))))
+	procAppendMenuW.Call(hmenu, mfString, menuSettings, uintptr(unsafe.Pointer(utf16Ptr("设置"))))
 	procAppendMenuW.Call(hmenu, mfString, menuExit, uintptr(unsafe.Pointer(utf16Ptr("完全退出"))))
 
 	// 必须先把窗口设为前台，否则菜单在点击别处时不会自动消失
@@ -230,6 +297,10 @@ func showTrayMenu(hwnd uintptr) {
 	switch cmd {
 	case menuShow:
 		openBrowser(trayURL)
+	case menuSettings:
+		dialogShowing = true
+		showSettingsDialog()
+		dialogShowing = false
 	case menuExit:
 		trayExit()
 	}
@@ -276,33 +347,67 @@ func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 
 var enumWindowsProcCB = syscall.NewCallback(enumWindowsProc)
 
+func appWindows() []syscall.Handle {
+	enumFoundWindows = nil
+	procEnumWindows.Call(enumWindowsProcCB, 0)
+	return append([]syscall.Handle(nil), enumFoundWindows...)
+}
+
+func showAppWindow() bool {
+	windows := appWindows()
+	if len(windows) == 0 {
+		return false
+	}
+	h := windows[0]
+	procShowWindow.Call(uintptr(h), swRestore)
+	procSetForegroundWindow.Call(uintptr(h))
+	return true
+}
+
+func showOrOpenAppWindow(url string) {
+	if showAppWindow() {
+		return
+	}
+	openBrowser(url)
+}
+
 // closeAppWindows 关闭本应用的 Edge --app 界面窗口（"完全退出"时调用）。
 // 用 PostMessage(WM_CLOSE) 只关闭匹配到的那个浏览器窗口，既不结束 Edge 进程、
 // 也不影响用户的其它 Edge 窗口或标签页。PostMessage 是投递到 Edge 进程的消息队列，
 // 即便本进程随后 os.Exit，Edge 也会照常处理该消息关闭窗口。
 func closeAppWindows() {
-	enumFoundWindows = nil
-	procEnumWindows.Call(enumWindowsProcCB, 0)
-	for _, h := range enumFoundWindows {
+	for _, h := range appWindows() {
 		procPostMessageW.Call(uintptr(h), wmClose, 0, 0)
 	}
 }
 
-// trayOnUIClose 由 /api/ui-closed 在界面窗口关闭时调用：首次关闭弹气泡提示。
-// 通过 PostMessage 把动作投递回托盘线程执行，避免跨线程操作 Shell_NotifyIcon。
+// trayOnUIClose 由 /api/ui-closed 在界面窗口关闭时调用，按 CloseAction 设置决定行为：
+//   - exit：直接完全退出
+//   - tray：最小化到托盘（首次给气泡提示）
+//   - ask（默认）：弹出询问对话框
+//
+// UI 操作统一通过 PostMessage 投递回托盘线程执行，避免跨线程操作窗口/托盘。
 func trayOnUIClose() {
-	if trayHwnd == 0 {
+	if trayHwnd == 0 || traySt == nil {
 		return
 	}
-	closeTipOnce.Do(func() {
-		procPostMessageW.Call(uintptr(trayHwnd), wmShowCloseTip, 0, 0)
-	})
+	switch traySt.GetCloseAction() {
+	case "exit":
+		trayExit()
+	case "tray":
+		closeTipOnce.Do(func() {
+			procPostMessageW.Call(uintptr(trayHwnd), wmShowCloseTip, 0, 0)
+		})
+	default: // ask
+		procPostMessageW.Call(uintptr(trayHwnd), wmAskClose, 0, 0)
+	}
 }
 
 // runTray 在主线程创建隐藏窗口与托盘图标，并进入消息循环（阻塞直到「完全退出」）。
 // 关闭界面窗口不会退出本进程，程序最小化到托盘继续提供服务。
-func runTray(url string) {
+func runTray(url string, st *AppState) {
 	trayURL = url
+	traySt = st
 	// GUI 消息循环必须固定在同一个 OS 线程
 	runtime.LockOSThread()
 
@@ -349,4 +454,170 @@ func runTray(url string) {
 		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
 	}
 	trayExit()
+}
+
+// ---------- 自定义对话框（关闭询问 / 设置）----------
+// 纯 Win32 自绘对话框：标准 MessageBox 不支持"记住选择"勾选框，
+// 而 TaskDialog 需要 ComCtl32 v6 清单依赖，故这里手动创建窗口+控件实现，保持零依赖且可在调试构建中正常运行。
+
+var (
+	dlgDone         bool           // 对话框是否已得到结果
+	dlgClickedID    uint32         // 被点击的按钮控件 ID（0 表示直接关闭）
+	dlgCheckHwnd    syscall.Handle // "记住选择"勾选框句柄（无则为 0）
+	dlgClassOnce    sync.Once
+	dlgClassNamePtr = utf16Ptr("NodePortProxyDlg")
+	dlgProcCB       = syscall.NewCallback(dlgProc)
+)
+
+// dlgProc 是自定义对话框的消息处理函数
+func dlgProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
+	switch msg {
+	case wmCommand:
+		id := uint32(wparam) & 0xFFFF
+		if id == idRemember {
+			return 0 // 勾选框：自动切换状态即可，不结束对话框
+		}
+		// 仅置标志，窗口销毁推迟到调用方读取完勾选框状态后再做，
+		// 否则 DestroyWindow 会连带销毁勾选框，导致读不到"记住"状态
+		dlgClickedID = id
+		dlgDone = true
+		return 0
+	case wmClose:
+		// 直接关闭对话框（点对话框自身的 X 或 Esc）：视为"最小化到托盘"，不记忆
+		dlgClickedID = 0
+		dlgDone = true
+		return 0
+	}
+	r, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wparam, lparam)
+	return r
+}
+
+// registerDlgClassOnce 注册对话框窗口类（仅一次）
+func registerDlgClassOnce(hInstance uintptr) {
+	dlgClassOnce.Do(func() {
+		var wc wndClassExW
+		wc.cbSize = uint32(unsafe.Sizeof(wc))
+		wc.lpfnWndProc = dlgProcCB
+		wc.hInstance = syscall.Handle(hInstance)
+		wc.hbrBackground = syscall.Handle(6) // COLOR_WINDOW+1，与系统对话框背景一致
+		wc.hIcon = loadAppIcon(hInstance)
+		wc.lpszClassName = dlgClassNamePtr
+		procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
+	})
+}
+
+// createDlg 创建一个屏幕居中、置顶的对话框窗口（不在任务栏显示）
+func createDlg(hInstance uintptr, title string, w, h int) uintptr {
+	registerDlgClassOnce(hInstance)
+	sw, _, _ := procGetSystemMetrics.Call(smCxScreen)
+	sh, _, _ := procGetSystemMetrics.Call(smCyScreen)
+	x := (int(sw) - w) / 2
+	y := (int(sh) - h) / 2
+	hwnd, _, _ := procCreateWindowExW.Call(
+		wsExDlgModalFrame|wsExTopmost|wsExToolWindow,
+		uintptr(unsafe.Pointer(dlgClassNamePtr)),
+		uintptr(unsafe.Pointer(utf16Ptr(title))),
+		wsCaption|wsSysMenu,
+		uintptr(x), uintptr(y), uintptr(w), uintptr(h),
+		0, 0, hInstance, 0,
+	)
+	return hwnd
+}
+
+// dlgAddControl 在对话框上创建一个子控件（STATIC 文本 / BUTTON 按钮或勾选框），并设置系统默认字体
+func dlgAddControl(parent, hInstance uintptr, class, text string, style uintptr, id uintptr, x, y, w, h int) syscall.Handle {
+	hctl, _, _ := procCreateWindowExW.Call(
+		0,
+		uintptr(unsafe.Pointer(utf16Ptr(class))),
+		uintptr(unsafe.Pointer(utf16Ptr(text))),
+		style,
+		uintptr(x), uintptr(y), uintptr(w), uintptr(h),
+		parent, id, hInstance, 0,
+	)
+	font, _, _ := procGetStockObject.Call(defaultGuiFont)
+	procSendMessageW.Call(hctl, wmSetFont, font, 1)
+	return syscall.Handle(hctl)
+}
+
+// runDlgModal 显示对话框并进入嵌套消息循环，直到对话框得到结果
+func runDlgModal(hwnd uintptr) {
+	procShowWindow.Call(hwnd, swShow)
+	procSetForegroundWindow.Call(hwnd)
+	var msg msgStruct
+	for !dlgDone {
+		r, _, _ := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
+		if int32(r) <= 0 {
+			break
+		}
+		procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
+		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
+	}
+}
+
+// dlgGetRemember 读取"记住选择"勾选框是否勾选
+func dlgGetRemember() bool {
+	if dlgCheckHwnd == 0 {
+		return false
+	}
+	r, _, _ := procSendMessageW.Call(uintptr(dlgCheckHwnd), bmGetCheck, 0, 0)
+	return r == bstChecked
+}
+
+// showCloseDialog 弹出"关闭方式"询问对话框，返回选择（"exit"/"tray"）与是否勾选记住
+func showCloseDialog() (string, bool) {
+	dlgDone = false
+	dlgClickedID = 0
+	dlgCheckHwnd = 0
+	hInstance, _, _ := procGetModuleHandleW.Call(0)
+	hwnd := createDlg(hInstance, "退出 — 多节点端口代理", 430, 252)
+	dlgAddControl(hwnd, hInstance, "STATIC",
+		"关闭窗口后，你希望如何处理本程序？\r\n\r\n• 完全退出：停止代理服务并结束程序\r\n• 最小化到托盘：保留后台代理服务，可随时从托盘恢复",
+		wsChild|wsVisible|ssLeft, 0, 22, 18, 384, 104)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "完全退出",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idExitBtn, 44, 130, 150, 36)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "最小化到托盘",
+		wsChild|wsVisible|wsTabStop|bsDefPushButton, idTrayBtn, 216, 130, 170, 36)
+	dlgCheckHwnd = dlgAddControl(hwnd, hInstance, "BUTTON", "记住我的选择，不再询问",
+		wsChild|wsVisible|wsTabStop|bsAutoCheckBox, idRemember, 44, 178, 340, 26)
+	runDlgModal(hwnd)
+	remember := dlgGetRemember() // 必须在销毁窗口前读取勾选框状态
+	procDestroyWindow.Call(hwnd)
+	switch dlgClickedID {
+	case idExitBtn:
+		return "exit", remember
+	case idTrayBtn:
+		return "tray", remember
+	default:
+		return "tray", false // 直接关闭对话框 = 最小化到托盘，且不记忆
+	}
+}
+
+// showSettingsDialog 弹出"设置"对话框，修改关闭按钮(X)的默认行为
+func showSettingsDialog() {
+	dlgDone = false
+	dlgClickedID = 0
+	dlgCheckHwnd = 0
+	hInstance, _, _ := procGetModuleHandleW.Call(0)
+	curText := map[string]string{"ask": "每次都询问", "exit": "直接完全退出", "tray": "最小化到托盘"}[traySt.GetCloseAction()]
+	hwnd := createDlg(hInstance, "设置 — 关闭按钮行为", 430, 236)
+	dlgAddControl(hwnd, hInstance, "STATIC",
+		"点击界面窗口右上角关闭按钮（X）时：\r\n\r\n当前设置："+curText,
+		wsChild|wsVisible|ssLeft, 0, 22, 18, 384, 76)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "每次都询问",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 20, 116, 124, 38)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "直接完全退出",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 152, 116, 124, 38)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "最小化到托盘",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 284, 116, 124, 38)
+	runDlgModal(hwnd)
+	clicked := dlgClickedID
+	procDestroyWindow.Call(hwnd)
+	switch clicked {
+	case idSetAsk:
+		traySt.SetCloseAction("ask")
+	case idSetExit:
+		traySt.SetCloseAction("exit")
+	case idSetTray:
+		traySt.SetCloseAction("tray")
+	}
 }

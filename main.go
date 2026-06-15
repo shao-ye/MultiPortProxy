@@ -21,6 +21,18 @@ const uiPort = 23456
 
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口
 func main() {
+	if release, alreadyRunning := acquireSingleInstance(); alreadyRunning {
+		for i := 0; i < 20; i++ {
+			if openExistingInstance() {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		return
+	} else {
+		defer release()
+	}
+
 	st := LoadState()
 
 	// 单实例检测：如果端口上已经跑着本应用，直接打开浏览器并退出
@@ -32,7 +44,7 @@ func main() {
 			break
 		}
 		if isSelfRunning(port) {
-			openBrowser(fmt.Sprintf("http://127.0.0.1:%d", port))
+			showOrOpenAppWindow(fmt.Sprintf("http://127.0.0.1:%d", port))
 			return
 		}
 		port++ // 端口被其它程序占用，顺延
@@ -80,9 +92,21 @@ func main() {
 		}
 	}()
 
-	// 进入系统托盘消息循环（阻塞）。关闭界面窗口后程序最小化到托盘继续运行，
-	// 仅当通过托盘菜单「完全退出」时才真正结束进程。
-	runTray(url)
+	// 进入系统托盘消息循环（阻塞）。关闭界面窗口后按设置决定退出/最小化到托盘，
+	// 仅当真正退出时才结束进程。
+	runTray(url, st)
+}
+
+// openExistingInstance 尝试唤起已经运行的实例；用于第二次双击 exe 时不再新建后端。
+func openExistingInstance() bool {
+	for i := 0; i < 10; i++ {
+		port := uiPort + i
+		if isSelfRunning(port) {
+			showOrOpenAppWindow(fmt.Sprintf("http://127.0.0.1:%d", port))
+			return true
+		}
+	}
+	return showAppWindow()
 }
 
 // isSelfRunning 检查指定端口上是否已经运行着本应用（通过 /api/ping 的标识判断）
@@ -114,6 +138,9 @@ func containsStr(s, sub string) bool {
 // 不指定 --user-data-dir：沿用用户默认 Edge 配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
 // "完全退出"时由 closeAppWindows 按窗口标题精确关闭本应用窗口（见 tray_windows.go）。
 func openBrowser(url string) {
+	if showAppWindow() {
+		return
+	}
 	edges := []string{
 		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
 		`C:\Program Files\Microsoft\Edge\Application\msedge.exe`,
