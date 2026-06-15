@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -18,6 +19,11 @@ var webFS embed.FS
 
 // uiPort 是网页界面的固定端口；被占用时会向后顺延
 const uiPort = 23456
+
+var (
+	browserOpenMu     sync.Mutex
+	lastBrowserOpenAt time.Time
+)
 
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口
 func main() {
@@ -138,9 +144,17 @@ func containsStr(s, sub string) bool {
 // 不指定 --user-data-dir：沿用用户默认 Edge 配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
 // "完全退出"时由 closeAppWindows 按窗口标题精确关闭本应用窗口（见 tray_windows.go）。
 func openBrowser(url string) {
+	browserOpenMu.Lock()
+	defer browserOpenMu.Unlock()
+
 	if showAppWindow() {
 		return
 	}
+	if time.Since(lastBrowserOpenAt) < 2*time.Second {
+		return
+	}
+	lastBrowserOpenAt = time.Now()
+
 	edges := []string{
 		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
 		`C:\Program Files\Microsoft\Edge\Application\msedge.exe`,

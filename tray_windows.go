@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"unicode/utf16"
@@ -45,9 +46,10 @@ var (
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 
-	procEnumWindows    = user32.NewProc("EnumWindows")
-	procGetWindowTextW = user32.NewProc("GetWindowTextW")
-	procGetClassNameW  = user32.NewProc("GetClassNameW")
+	procEnumWindows     = user32.NewProc("EnumWindows")
+	procGetWindowTextW  = user32.NewProc("GetWindowTextW")
+	procGetClassNameW   = user32.NewProc("GetClassNameW")
+	procIsWindowVisible = user32.NewProc("IsWindowVisible")
 
 	// 自定义对话框（关闭询问 / 设置）所需
 	procDestroyWindow    = user32.NewProc("DestroyWindow")
@@ -243,7 +245,7 @@ func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 		// lParam 低位是具体的鼠标事件
 		switch uint32(lparam) {
 		case wmLButtonUp, wmLButtonDblClk:
-			openBrowser(trayURL) // 左键/双击：重新打开界面窗口
+			showOrOpenAppWindow(trayURL) // 左键/双击：显示已有界面窗口
 		case wmRButtonUp:
 			showTrayMenu(hwnd) // 右键：弹出菜单
 		}
@@ -296,7 +298,7 @@ func showTrayMenu(hwnd uintptr) {
 
 	switch cmd {
 	case menuShow:
-		openBrowser(trayURL)
+		showOrOpenAppWindow(trayURL)
 	case menuSettings:
 		dialogShowing = true
 		showSettingsDialog()
@@ -328,17 +330,20 @@ func trayExit() {
 // enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄
 var enumFoundWindows []syscall.Handle
 
-// enumWindowsProc 是 EnumWindows 的回调：按"标题 + 窗口类"精确匹配本应用的 Edge --app 窗口。
-// 标题取自网页 <title>，窗口类用 Chrome_WidgetWin_1 以排除本应用自己的隐藏托盘窗口（同标题不同类）。
+// enumWindowsProc 是 EnumWindows 的回调：按"标题包含应用名 + Chrome/Edge 顶层窗口类"匹配本应用的 Edge --app 窗口。
+// Edge --app 的实际标题在不同版本/语言环境下可能带后缀，不能用完全相等判断。
 func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
+	visible, _, _ := procIsWindowVisible.Call(hwnd)
+	if visible == 0 {
+		return 1
+	}
 	var title [256]uint16
 	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&title[0])), uintptr(len(title)))
-	if syscall.UTF16ToString(title[:]) != appWindowTitle {
-		return 1 // 继续枚举
-	}
+	titleText := syscall.UTF16ToString(title[:])
 	var cls [128]uint16
 	procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&cls[0])), uintptr(len(cls)))
-	if syscall.UTF16ToString(cls[:]) != edgeWindowClass {
+	classText := syscall.UTF16ToString(cls[:])
+	if !strings.Contains(titleText, appWindowTitle) || !strings.HasPrefix(classText, edgeWindowClass) {
 		return 1
 	}
 	enumFoundWindows = append(enumFoundWindows, syscall.Handle(hwnd))
@@ -361,6 +366,9 @@ func showAppWindow() bool {
 	h := windows[0]
 	procShowWindow.Call(uintptr(h), swRestore)
 	procSetForegroundWindow.Call(uintptr(h))
+	for _, extra := range windows[1:] {
+		procPostMessageW.Call(uintptr(extra), wmClose, 0, 0)
+	}
 	return true
 }
 
