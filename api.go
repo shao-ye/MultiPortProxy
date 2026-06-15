@@ -143,6 +143,14 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 		jsonResp(w, map[string]int{"assigned": count})
 	})
 
+	// 自动探测 mihomo / xray 内核路径（优先通过运行中的 v2rayN 进程定位）
+	mux.HandleFunc("/api/detect", func(w http.ResponseWriter, r *http.Request) {
+		jsonResp(w, map[string]string{
+			"corePath": detectCorePath(),
+			"xrayPath": detectXrayPath(),
+		})
+	})
+
 	// 启动代理服务（已运行时相当于重启，应用最新配置）
 	mux.HandleFunc("/api/start", func(w http.ResponseWriter, r *http.Request) {
 		// 启动前自动补齐未分配的端口，省去手动点"自动分配"

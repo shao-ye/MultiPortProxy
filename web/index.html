@@ -147,9 +147,10 @@
   </div>
   <div class="row" style="margin-top:8px">
     <label>xray 路径 <input type="text" id="setXrayPath" style="width:380px"></label>
+    <button class="primary" onclick="detectCores()">🔍 自动探测内核</button>
     <span class="muted">仅 xhttp 节点需要</span>
   </div>
-  <div class="muted" style="margin-top:6px">内核直接复用 v2rayN 自带的 mihomo.exe / xray.exe；勾选"允许局域网"后其它电脑可通过本机 IP 使用这些代理端口</div>
+  <div class="muted" style="margin-top:6px">点"自动探测内核"会通过运行中的 v2rayN 进程自动定位 mihomo.exe / xray.exe（请先开着 v2rayN）；也可手动粘贴路径。勾选"允许局域网"后其它电脑可通过本机 IP 使用这些代理端口</div>
 </div>
 
 <!-- 日志面板 -->
@@ -353,6 +354,22 @@ async function saveSettings() {
     });
     toast('设置已保存' + (state.running ? '，重启服务后生效' : ''));
     await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 自动探测内核路径并填入输入框（不自动保存，由用户确认后点"保存设置"）
+async function detectCores() {
+  try {
+    const r = await (await fetch('/api/detect')).json();
+    const core = document.getElementById('setCorePath');
+    const xray = document.getElementById('setXrayPath');
+    if (r.corePath) core.value = r.corePath;
+    if (r.xrayPath) xray.value = r.xrayPath;
+    if (r.corePath || r.xrayPath) {
+      toast('已探测到内核路径，确认无误后点"保存设置"');
+    } else {
+      toast('未找到内核，请确认 v2rayN 正在运行，或手动粘贴路径', true);
+    }
   } catch (e) { toast(e.message, true); }
 }
 

@@ -71,7 +71,11 @@ func exeDir() string {
 func findCore(kernel string) string {
 	exeName := kernel + ".exe"
 	candidates := []string{filepath.Join(exeDir(), exeName)}
-	// 常见的 v2rayN 安装根目录
+	// 优先：通过运行中的 v2rayN 进程定位安装目录（不管装在哪都能找到）
+	if dir := findV2rayNDir(); dir != "" {
+		candidates = append(candidates, filepath.Join(dir, "bin", kernel, exeName))
+	}
+	// 兜底：常见的 v2rayN 安装根目录
 	roots := []string{
 		`C:\Program Files\v2rayN`,
 		`C:\Program Files (x86)\v2rayN`,
