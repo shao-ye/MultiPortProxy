@@ -95,8 +95,8 @@ go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
 <summary>📱 点击展开微信赞赏码 / 支付宝收款码</summary>
 <br>
 <p>
-  <img src="docs/donate-wechat.jpg" alt="微信赞赏码" width="200">
-  <img src="docs/donate-alipay.png" alt="支付宝收款码" width="200">
+  <img src="docs/donate-wechat.jpg" alt="微信赞赏码" height="260">
+  <img src="docs/donate-alipay.png" alt="支付宝收款码" height="260">
 </p>
 </details>
 
@@ -145,8 +145,8 @@ If this project helps you, consider buying the author a coffee ☕
 <summary>📱 WeChat reward code / Alipay QR code</summary>
 <br>
 <p>
-  <img src="docs/donate-wechat.jpg" alt="WeChat reward code" width="200">
-  <img src="docs/donate-alipay.png" alt="Alipay QR code" width="200">
+  <img src="docs/donate-wechat.jpg" alt="WeChat reward code" height="260">
+  <img src="docs/donate-alipay.png" alt="Alipay QR code" height="260">
 </p>
 </details>
 
