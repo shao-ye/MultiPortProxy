@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 )
 
-const browserDefault = "default"
+const (
+	browserAuto   = "auto"
+	browserSystem = "system"
+)
 
 type browserInfo struct {
 	ID      string
@@ -20,8 +23,10 @@ func normalizeBrowserChoice(choice string) string {
 	switch choice {
 	case "edge", "chrome", "firefox", "brave", "vivaldi", "opera":
 		return choice
+	case browserSystem:
+		return browserSystem
 	default:
-		return browserDefault
+		return browserAuto
 	}
 }
 
@@ -127,10 +132,13 @@ func detectInstalledBrowsers() []browserInfo {
 
 func findInstalledBrowser(choice string) (browserInfo, bool) {
 	choice = normalizeBrowserChoice(choice)
-	if choice == browserDefault {
+	if choice == browserSystem {
 		return browserInfo{}, false
 	}
 	for _, browser := range detectInstalledBrowsers() {
+		if choice == browserAuto && browser.AppMode {
+			return browser, true
+		}
 		if browser.ID == choice {
 			return browser, true
 		}

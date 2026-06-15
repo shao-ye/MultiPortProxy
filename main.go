@@ -142,8 +142,8 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
-// openBrowser 默认用系统默认浏览器打开；用户在托盘设置中指定浏览器时，
-// 对 Chromium 系浏览器使用应用模式打开（独立窗口、无地址栏，更像桌面应用）。
+// openBrowser 默认用 Chromium 应用模式打开（独立窗口、无地址栏，更像桌面应用）；
+// 只有用户在托盘设置中明确选择系统默认浏览器时，才退回普通浏览器打开。
 // 不指定 --user-data-dir：沿用用户默认浏览器配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
 // "完全退出"时由 closeAppWindows 按窗口标题精确关闭本应用窗口（见 tray_windows.go）。
 func openBrowser(url string) {
@@ -158,7 +158,7 @@ func openBrowser(url string) {
 	}
 	lastBrowserOpenAt = time.Now()
 
-	choice := browserDefault
+	choice := browserAuto
 	if browserState != nil {
 		choice = browserState.GetBrowserChoice()
 	}

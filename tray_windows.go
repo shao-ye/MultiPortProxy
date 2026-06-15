@@ -100,17 +100,18 @@ const (
 	swRestore      = 9
 
 	// 对话框控件 ID
-	idExitBtn        = 101 // 关闭询问：完全退出
-	idTrayBtn        = 102 // 关闭询问：最小化到托盘
-	idRemember       = 103 // 关闭询问：记住选择 勾选框
-	idSetAsk         = 201 // 设置：每次都询问
-	idSetExit        = 202 // 设置：直接完全退出
-	idSetTray        = 203 // 设置：最小化到托盘
-	idLangZh         = 204 // 设置：简体中文
-	idLangEn         = 205 // 设置：English
-	idSetClose       = 206 // 设置：关闭设置窗口
-	idBrowserDefault = 207 // 设置：系统默认浏览器
-	idBrowserFirst   = 220 // 设置：已检测浏览器按钮起始 ID
+	idExitBtn       = 101 // 关闭询问：完全退出
+	idTrayBtn       = 102 // 关闭询问：最小化到托盘
+	idRemember      = 103 // 关闭询问：记住选择 勾选框
+	idSetAsk        = 201 // 设置：每次都询问
+	idSetExit       = 202 // 设置：直接完全退出
+	idSetTray       = 203 // 设置：最小化到托盘
+	idLangZh        = 204 // 设置：简体中文
+	idLangEn        = 205 // 设置：English
+	idSetClose      = 206 // 设置：关闭设置窗口
+	idBrowserAuto   = 207 // 设置：独立应用窗口
+	idBrowserSystem = 208 // 设置：系统默认浏览器
+	idBrowserFirst  = 220 // 设置：已检测浏览器按钮起始 ID
 
 	// appWindowTitle 是浏览器 app 模式界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
 	// chromiumWindowClass 是 Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
@@ -696,8 +697,11 @@ func showCloseDialog() (string, bool) {
 
 func trayBrowserChoiceName(choice string, browsers []browserInfo) string {
 	choice = normalizeBrowserChoice(choice)
-	if choice == browserDefault {
-		return trayText("系统默认浏览器", "System default browser")
+	if choice == browserAuto {
+		return trayText("独立应用窗口（推荐）", "App window (recommended)")
+	}
+	if choice == browserSystem {
+		return trayText("系统默认浏览器（普通标签页）", "System default browser (regular tab)")
 	}
 	for _, browser := range browsers {
 		if browser.ID == choice {
@@ -709,7 +713,7 @@ func trayBrowserChoiceName(choice string, browsers []browserInfo) string {
 			return browser.Name + trayText("（未检测到）", " (not detected)")
 		}
 	}
-	return trayText("系统默认浏览器", "System default browser")
+	return trayText("独立应用窗口（推荐）", "App window (recommended)")
 }
 
 // showSettingsDialog 弹出"设置"对话框，修改关闭按钮(X)、界面语言和加载浏览器。
@@ -757,10 +761,12 @@ func showSettingsDialog() {
 	dlgAddControl(hwnd, hInstance, "STATIC",
 		trayText("当前：", "Current: ")+curBrowser,
 		wsChild|wsVisible|ssLeft, 0, 42, 228, 500, 24)
-	dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browserDefault)+trayText("系统默认", "System default"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserDefault, 42, 258, 160, 34)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browserAuto)+trayText("独立窗口", "App window"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserAuto, 42, 258, 160, 34)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browserSystem)+trayText("系统默认", "System default"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserSystem, 220, 258, 160, 34)
 	for i, browser := range browsers {
-		idx := i + 1
+		idx := i + 2
 		x := 42 + (idx%3)*178
 		y := 258 + (idx/3)*38
 		dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browser.ID)+browser.Name,
@@ -777,7 +783,7 @@ func showSettingsDialog() {
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "en")+"English",
 		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 322, 450, 150, 34)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("选择会立即保存。系统默认浏览器会按 Windows 默认应用打开。", "Changes are saved immediately. The system default browser follows Windows default apps."),
+		trayText("选择会立即保存。默认保持独立应用窗口；系统默认浏览器会打开普通标签页。", "Changes are saved immediately. Default keeps the app window; system default opens a regular tab."),
 		wsChild|wsVisible|ssLeft, 0, 24, 508, 430, 36)
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完成", "Done"),
 		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 488, 508, 100, 36)
@@ -797,8 +803,10 @@ func showSettingsDialog() {
 	case idLangEn:
 		traySt.SetLanguage("en")
 		updateTrayTip()
-	case idBrowserDefault:
-		traySt.SetBrowserChoice(browserDefault)
+	case idBrowserAuto:
+		traySt.SetBrowserChoice(browserAuto)
+	case idBrowserSystem:
+		traySt.SetBrowserChoice(browserSystem)
 	case idSetClose:
 		return
 	default:

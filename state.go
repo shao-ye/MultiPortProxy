@@ -45,7 +45,7 @@ type AppState struct {
 	CloseAction string `json:"closeAction"`
 	// Language 决定托盘菜单、原生弹窗和网页界面的显示语言："zh-CN" 或 "en"。空串按 "zh-CN" 处理。
 	Language string `json:"language"`
-	// BrowserChoice 决定托盘打开界面时使用的浏览器："default"=系统默认浏览器，或检测到的浏览器 ID。
+	// BrowserChoice 决定托盘打开界面时使用的浏览器："auto"=独立应用窗口（默认），"system"=系统默认浏览器，或检测到的浏览器 ID。
 	BrowserChoice string `json:"browserChoice"`
 	file          string // 持久化文件路径
 }
@@ -105,7 +105,7 @@ func (st *AppState) SetLanguage(language string) {
 	st.mu.Unlock()
 }
 
-// GetBrowserChoice 返回当前界面加载浏览器；未设置时默认使用系统默认浏览器。
+// GetBrowserChoice 返回当前界面加载浏览器；未设置时默认使用独立应用窗口。
 func (st *AppState) GetBrowserChoice() string {
 	st.mu.Lock()
 	defer st.mu.Unlock()
