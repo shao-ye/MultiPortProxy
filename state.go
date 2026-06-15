@@ -43,7 +43,9 @@ type AppState struct {
 	// CloseAction 决定点击界面窗口关闭按钮(X)时的行为：
 	// "ask"=每次询问（默认）, "exit"=直接完全退出, "tray"=最小化到托盘。空串按 "ask" 处理。
 	CloseAction string `json:"closeAction"`
-	file        string // 持久化文件路径
+	// Language 决定托盘菜单、原生弹窗和网页界面的显示语言："zh-CN" 或 "en"。空串按 "zh-CN" 处理。
+	Language string `json:"language"`
+	file     string // 持久化文件路径
 }
 
 // persistedState 是写入磁盘的精简结构（节点只保留必要字段）
@@ -51,6 +53,7 @@ type persistedState struct {
 	Settings    Settings `json:"settings"`
 	AutoStart   bool     `json:"autoStart"`
 	CloseAction string   `json:"closeAction"`
+	Language    string   `json:"language"`
 	Nodes       []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
@@ -73,6 +76,28 @@ func (st *AppState) GetCloseAction() string {
 func (st *AppState) SetCloseAction(action string) {
 	st.mu.Lock()
 	st.CloseAction = action
+	_ = st.saveLocked()
+	st.mu.Unlock()
+}
+
+func normalizeLanguage(language string) string {
+	if language == "en" {
+		return "en"
+	}
+	return "zh-CN"
+}
+
+// GetLanguage 返回当前界面语言；未设置时默认简体中文。
+func (st *AppState) GetLanguage() string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return normalizeLanguage(st.Language)
+}
+
+// SetLanguage 设置界面语言并立即持久化。
+func (st *AppState) SetLanguage(language string) {
+	st.mu.Lock()
+	st.Language = normalizeLanguage(language)
 	_ = st.saveLocked()
 	st.mu.Unlock()
 }
@@ -153,6 +178,7 @@ func LoadState() *AppState {
 	}
 	st.AutoStart = ps.AutoStart
 	st.CloseAction = ps.CloseAction
+	st.Language = normalizeLanguage(ps.Language)
 	// 如果保存的内核路径已失效，重新自动探测
 	if _, err := os.Stat(st.Settings.CorePath); err != nil {
 		st.Settings.CorePath = detectCorePath()
@@ -184,6 +210,7 @@ func (st *AppState) saveLocked() error {
 	ps.Settings = st.Settings
 	ps.AutoStart = st.AutoStart
 	ps.CloseAction = st.CloseAction
+	ps.Language = normalizeLanguage(st.Language)
 	for _, n := range st.Nodes {
 		ps.Nodes = append(ps.Nodes, struct {
 			ID   string `json:"id"`

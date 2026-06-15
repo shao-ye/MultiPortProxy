@@ -42,11 +42,24 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 			"settings": st.Settings,
 			"nodes":    st.Nodes,
 			"running":  core.IsRunning(),
+			"language": normalizeLanguage(st.Language),
 		}
 		buf, _ := json.Marshal(resp)
 		st.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_, _ = w.Write(buf)
+	})
+
+	mux.HandleFunc("/api/language", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Language string `json:"language"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonErr(w, "请求格式错误")
+			return
+		}
+		st.SetLanguage(req.Language)
+		jsonResp(w, map[string]string{"language": st.GetLanguage()})
 	})
 
 	// 批量导入分享链接，逐行解析，返回成功/失败统计

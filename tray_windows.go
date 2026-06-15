@@ -105,9 +105,10 @@ const (
 	idSetAsk   = 201 // 设置：每次都询问
 	idSetExit  = 202 // 设置：直接完全退出
 	idSetTray  = 203 // 设置：最小化到托盘
+	idLangZh   = 204 // 设置：简体中文
+	idLangEn   = 205 // 设置：English
 
 	// appWindowTitle 是 Edge --app 界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
-	appWindowTitle = "多节点端口代理"
 	// edgeWindowClass 是 Edge/Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
 	edgeWindowClass = "Chrome_WidgetWin_1"
 
@@ -197,6 +198,35 @@ var (
 	dialogShowing bool // 正在显示关闭询问/设置对话框时为 true，避免重复弹出
 )
 
+var appWindowTitles = []string{"多节点端口代理", "MultiPortProxy"}
+
+func trayLanguage() string {
+	if traySt == nil {
+		return "zh-CN"
+	}
+	return traySt.GetLanguage()
+}
+
+func trayText(zhCN, en string) string {
+	if trayLanguage() == "en" {
+		return en
+	}
+	return zhCN
+}
+
+func trayAppName() string {
+	return trayText("多节点端口代理", "MultiPortProxy")
+}
+
+func windowTitleMatchesApp(title string) bool {
+	for _, appTitle := range appWindowTitles {
+		if strings.Contains(title, appTitle) {
+			return true
+		}
+	}
+	return false
+}
+
 // utf16Ptr 把 Go 字符串转成以 NUL 结尾的 UTF-16 指针（出错时返回空字符串指针）
 func utf16Ptr(s string) *uint16 {
 	p, err := syscall.UTF16PtrFromString(s)
@@ -282,9 +312,9 @@ func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 // showTrayMenu 在鼠标位置弹出托盘右键菜单（显示界面 / 设置 / 完全退出）
 func showTrayMenu(hwnd uintptr) {
 	hmenu, _, _ := procCreatePopupMenu.Call()
-	procAppendMenuW.Call(hmenu, mfString, menuShow, uintptr(unsafe.Pointer(utf16Ptr("显示界面"))))
-	procAppendMenuW.Call(hmenu, mfString, menuSettings, uintptr(unsafe.Pointer(utf16Ptr("设置"))))
-	procAppendMenuW.Call(hmenu, mfString, menuExit, uintptr(unsafe.Pointer(utf16Ptr("完全退出"))))
+	procAppendMenuW.Call(hmenu, mfString, menuShow, uintptr(unsafe.Pointer(utf16Ptr(trayText("显示界面", "Show window")))))
+	procAppendMenuW.Call(hmenu, mfString, menuSettings, uintptr(unsafe.Pointer(utf16Ptr(trayText("设置", "Settings")))))
+	procAppendMenuW.Call(hmenu, mfString, menuExit, uintptr(unsafe.Pointer(utf16Ptr(trayText("完全退出", "Exit")))))
 
 	// 必须先把窗口设为前台，否则菜单在点击别处时不会自动消失
 	procSetForegroundWindow.Call(hwnd)
@@ -312,12 +342,24 @@ func showTrayMenu(hwnd uintptr) {
 // showCloseTip 弹出"已最小化到托盘"气泡提示（仅首次关闭窗口时触发）
 func showCloseTip() {
 	trayNID.uFlags = nifInfo
-	copyUTF16(trayNID.szInfoTitle[:], "多节点端口代理")
-	copyUTF16(trayNID.szInfo[:], "已最小化到托盘，仍在后台运行。\n右键托盘图标可「显示界面」或「完全退出」。")
+	copyUTF16(trayNID.szInfoTitle[:], trayAppName())
+	copyUTF16(trayNID.szInfo[:], trayText(
+		"已最小化到托盘，仍在后台运行。\n右键托盘图标可「显示界面」或「完全退出」。",
+		"Minimized to the tray and still running in the background.\nRight-click the tray icon to show the window or exit.",
+	))
 	trayNID.dwInfoFlags = niifInfo
 	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&trayNID)))
 	// 恢复常规标志，避免后续 Modify 再次触发气泡
 	trayNID.uFlags = nifMessage | nifIcon | nifTip
+}
+
+func updateTrayTip() {
+	if trayHwnd == 0 {
+		return
+	}
+	trayNID.uFlags = nifMessage | nifIcon | nifTip
+	copyUTF16(trayNID.szTip[:], trayAppName())
+	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&trayNID)))
 }
 
 // trayExit 彻底退出：移除托盘图标、关闭界面窗口、停止内核、结束进程
@@ -365,7 +407,7 @@ func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	var cls [128]uint16
 	procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&cls[0])), uintptr(len(cls)))
 	classText := syscall.UTF16ToString(cls[:])
-	if !strings.Contains(titleText, appWindowTitle) || !strings.HasPrefix(classText, edgeWindowClass) {
+	if !windowTitleMatchesApp(titleText) || !strings.HasPrefix(classText, edgeWindowClass) {
 		return 1
 	}
 	if windowProcessBaseName(hwnd) != "msedge.exe" {
@@ -461,7 +503,7 @@ func runTray(url string, st *AppState) {
 	hwnd, _, _ := procCreateWindowExW.Call(
 		0,
 		uintptr(unsafe.Pointer(className)),
-		uintptr(unsafe.Pointer(utf16Ptr("多节点端口代理"))),
+		uintptr(unsafe.Pointer(utf16Ptr(trayAppName()))),
 		0, 0, 0, 0, 0, 0, 0, hInstance, 0,
 	)
 	trayHwnd = syscall.Handle(hwnd)
@@ -473,7 +515,7 @@ func runTray(url string, st *AppState) {
 	trayNID.uFlags = nifMessage | nifIcon | nifTip
 	trayNID.uCallbackMessage = wmTrayCallback
 	trayNID.hIcon = hIcon
-	copyUTF16(trayNID.szTip[:], "多节点端口代理")
+	copyUTF16(trayNID.szTip[:], trayAppName())
 	procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&trayNID)))
 
 	// 消息循环
@@ -602,15 +644,18 @@ func showCloseDialog() (string, bool) {
 	dlgClickedID = 0
 	dlgCheckHwnd = 0
 	hInstance, _, _ := procGetModuleHandleW.Call(0)
-	hwnd := createDlg(hInstance, "退出 — 多节点端口代理", 430, 252)
+	hwnd := createDlg(hInstance, trayText("退出 - 多节点端口代理", "Exit - MultiPortProxy"), 430, 252)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		"关闭窗口后，你希望如何处理本程序？\r\n\r\n• 完全退出：停止代理服务并结束程序\r\n• 最小化到托盘：保留后台代理服务，可随时从托盘恢复",
+		trayText(
+			"关闭窗口后，你希望如何处理本程序？\r\n\r\n- 完全退出：停止代理服务并结束程序\r\n- 最小化到托盘：保留后台代理服务，可随时从托盘恢复",
+			"What should happen when the window is closed?\r\n\r\n- Exit: stop proxy service and quit the app\r\n- Minimize to tray: keep proxy service running in the background",
+		),
 		wsChild|wsVisible|ssLeft, 0, 22, 18, 384, 104)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "完全退出",
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完全退出", "Exit"),
 		wsChild|wsVisible|wsTabStop|bsPushButton, idExitBtn, 44, 130, 150, 36)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "最小化到托盘",
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("最小化到托盘", "Minimize to tray"),
 		wsChild|wsVisible|wsTabStop|bsDefPushButton, idTrayBtn, 216, 130, 170, 36)
-	dlgCheckHwnd = dlgAddControl(hwnd, hInstance, "BUTTON", "记住我的选择，不再询问",
+	dlgCheckHwnd = dlgAddControl(hwnd, hInstance, "BUTTON", trayText("记住我的选择，不再询问", "Remember my choice"),
 		wsChild|wsVisible|wsTabStop|bsAutoCheckBox, idRemember, 44, 178, 340, 26)
 	runDlgModal(hwnd)
 	remember := dlgGetRemember() // 必须在销毁窗口前读取勾选框状态
@@ -631,17 +676,29 @@ func showSettingsDialog() {
 	dlgClickedID = 0
 	dlgCheckHwnd = 0
 	hInstance, _, _ := procGetModuleHandleW.Call(0)
-	curText := map[string]string{"ask": "每次都询问", "exit": "直接完全退出", "tray": "最小化到托盘"}[traySt.GetCloseAction()]
-	hwnd := createDlg(hInstance, "设置 — 关闭按钮行为", 430, 236)
+	curText := map[string]string{
+		"ask":  trayText("每次都询问", "Ask every time"),
+		"exit": trayText("直接完全退出", "Exit directly"),
+		"tray": trayText("最小化到托盘", "Minimize to tray"),
+	}[traySt.GetCloseAction()]
+	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[trayLanguage()]
+	hwnd := createDlg(hInstance, trayText("设置", "Settings"), 470, 306)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		"点击界面窗口右上角关闭按钮（X）时：\r\n\r\n当前设置："+curText,
-		wsChild|wsVisible|ssLeft, 0, 22, 18, 384, 76)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "每次都询问",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 20, 116, 124, 38)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "直接完全退出",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 152, 116, 124, 38)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "最小化到托盘",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 284, 116, 124, 38)
+		trayText("关闭按钮（X）行为：", "Close button (X) behavior:")+"\r\n"+trayText("当前设置：", "Current: ")+curText,
+		wsChild|wsVisible|ssLeft, 0, 22, 18, 420, 54)
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("每次都询问", "Ask every time"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 20, 82, 134, 38)
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("直接完全退出", "Exit directly"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 164, 82, 134, 38)
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("最小化到托盘", "Minimize to tray"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 308, 82, 134, 38)
+	dlgAddControl(hwnd, hInstance, "STATIC",
+		trayText("界面语言：", "Language: ")+"\r\n"+trayText("当前语言：", "Current: ")+curLang,
+		wsChild|wsVisible|ssLeft, 0, 22, 146, 420, 54)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "简体中文",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 92, 206, 134, 38)
+	dlgAddControl(hwnd, hInstance, "BUTTON", "English",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 244, 206, 134, 38)
 	runDlgModal(hwnd)
 	clicked := dlgClickedID
 	procDestroyWindow.Call(hwnd)
@@ -652,5 +709,11 @@ func showSettingsDialog() {
 		traySt.SetCloseAction("exit")
 	case idSetTray:
 		traySt.SetCloseAction("tray")
+	case idLangZh:
+		traySt.SetLanguage("zh-CN")
+		updateTrayTip()
+	case idLangEn:
+		traySt.SetLanguage("en")
+		updateTrayTip()
 	}
 }

@@ -182,7 +182,7 @@ async function post(url, body) {
     body: JSON.stringify(body || {}),
   });
   const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || '请求失败');
+  if (!resp.ok) throw new Error(data.error || t('requestFailed'));
   return data;
 }
 
@@ -193,14 +193,188 @@ function esc(s) {
 
 /* ================= 状态刷新 ================= */
 
-let state = { nodes: [], running: false, settings: {} };
+let state = { nodes: [], running: false, settings: {}, language: 'zh-CN' };
 let settingsLoaded = false; // 设置输入框只在首次加载时填充，避免覆盖用户正在输入的内容
+
+const I18N = {
+  'zh-CN': {
+    title: '多节点端口代理',
+    running: '服务运行中',
+    stopped: '服务未运行',
+    start: '启动服务',
+    restart: '重启(应用修改)',
+    stop: '停止服务',
+    importTitle: '导入节点（从 v2rayN 节点上右键 → 分享 → 复制分享链接到剪贴板，支持多行批量粘贴）',
+    import: '导入',
+    protocolHint: '支持 VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp（xhttp 节点由 xray 内核承载）',
+    nodeList: '节点列表',
+    autoAssign: '自动分配端口',
+    testAll: '测试全部延迟',
+    deleteSelected: '删除选中',
+    name: '名称',
+    protocol: '协议',
+    server: '服务器',
+    localPort: '本地端口',
+    proxyAddr: '代理地址(点击复制)',
+    delay: '延迟',
+    empty: '暂无节点，请在上方粘贴分享链接导入',
+    settings: '设置',
+    mihomoPath: 'mihomo 路径',
+    xrayPath: 'xray 路径',
+    basePort: '起始端口',
+    allowLan: '允许局域网连接',
+    saveSettings: '保存设置',
+    detectCores: '🔍 自动探测内核',
+    xhttpOnly: '仅 xhttp 节点需要',
+    settingsHint: '点“自动探测内核”会通过运行中的 v2rayN 进程自动定位 mihomo.exe / xray.exe（请先开着 v2rayN）；也可手动粘贴路径。勾选“允许局域网”后其它电脑可通过本机 IP 使用这些代理端口',
+    logs: '内核日志',
+    failed: '失败',
+    parseFailed: '解析失败',
+    auto: '自动',
+    unassigned: '未分配',
+    testing: '测试中...',
+    copiedSuffix: '（socks5 和 http 均可用）',
+    copyFailed: '复制失败',
+    pasteFirst: '请先粘贴分享链接',
+    importOk: '导入成功',
+    skipped: '跳过重复',
+    changedRestart: '端口已修改，点击“重启”按钮生效',
+    assigned: '已为',
+    assignedSuffix: '个节点分配端口',
+    assignedRestart: '端口已分配，点击“重启”按钮生效',
+    serviceStarted: '服务已启动',
+    serviceStopped: '服务已停止',
+    testDone: '测试完成',
+    chooseDelete: '请先勾选要删除的节点',
+    confirmDeletePrefix: '确定删除选中的',
+    confirmDeleteSuffix: '个节点？',
+    deletedPrefix: '已删除',
+    deletedSuffix: '个节点',
+    deletedRestart: '节点已删除，点击“重启”按钮生效',
+    settingsSaved: '设置已保存',
+    restartAfterSave: '，重启服务后生效',
+    detected: '已探测到内核路径，确认无误后点“保存设置”',
+    notDetected: '未找到内核，请确认 v2rayN 正在运行，或手动粘贴路径',
+    requestFailed: '请求失败',
+  },
+  en: {
+    title: 'MultiPortProxy',
+    running: 'Service running',
+    stopped: 'Service stopped',
+    start: 'Start service',
+    restart: 'Restart',
+    stop: 'Stop service',
+    importTitle: 'Import nodes (copy share links from v2rayN, one per line is supported)',
+    import: 'Import',
+    protocolHint: 'Supports VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / VLESS-xhttp (xhttp nodes use the xray core)',
+    nodeList: 'Nodes',
+    autoAssign: 'Assign ports',
+    testAll: 'Test latency',
+    deleteSelected: 'Delete selected',
+    name: 'Name',
+    protocol: 'Protocol',
+    server: 'Server',
+    localPort: 'Local port',
+    proxyAddr: 'Proxy address (click to copy)',
+    delay: 'Latency',
+    empty: 'No nodes yet. Paste share links above to import.',
+    settings: 'Settings',
+    mihomoPath: 'mihomo path',
+    xrayPath: 'xray path',
+    basePort: 'Base port',
+    allowLan: 'Allow LAN connections',
+    saveSettings: 'Save settings',
+    detectCores: '🔍 Auto-detect cores',
+    xhttpOnly: 'Only needed for xhttp nodes',
+    settingsHint: 'Auto-detect locates mihomo.exe / xray.exe from a running v2rayN process. You can also paste paths manually. When LAN is enabled, other computers can use these proxy ports through this machine IP.',
+    logs: 'Core logs',
+    failed: 'Failed',
+    parseFailed: 'Parse failed',
+    auto: 'Auto',
+    unassigned: 'Unassigned',
+    testing: 'Testing...',
+    copiedSuffix: '(socks5 and http are both available)',
+    copyFailed: 'Copy failed',
+    pasteFirst: 'Paste share links first',
+    importOk: 'Imported',
+    skipped: 'skipped duplicates',
+    changedRestart: 'Port changed. Click Restart to apply.',
+    assigned: 'Assigned ports for',
+    assignedSuffix: 'nodes',
+    assignedRestart: 'Ports assigned. Click Restart to apply.',
+    serviceStarted: 'Service started',
+    serviceStopped: 'Service stopped',
+    testDone: 'Test completed',
+    chooseDelete: 'Select nodes to delete first',
+    confirmDeletePrefix: 'Delete',
+    confirmDeleteSuffix: 'selected nodes?',
+    deletedPrefix: 'Deleted',
+    deletedSuffix: 'nodes',
+    deletedRestart: 'Nodes deleted. Click Restart to apply.',
+    settingsSaved: 'Settings saved',
+    restartAfterSave: '. Restart service to apply.',
+    detected: 'Core paths detected. Check them, then click Save settings.',
+    notDetected: 'No cores found. Make sure v2rayN is running or paste paths manually.',
+    requestFailed: 'Request failed',
+  },
+};
+
+function lang() {
+  return state.language === 'en' ? 'en' : 'zh-CN';
+}
+
+function t(key) {
+  return (I18N[lang()] && I18N[lang()][key]) || I18N['zh-CN'][key] || key;
+}
+
+function setLabelText(label, text) {
+  if (label && label.childNodes.length) label.childNodes[0].nodeValue = text + ' ';
+}
+
+function applyI18n() {
+  document.documentElement.lang = lang() === 'en' ? 'en' : 'zh-CN';
+  document.title = t('title');
+  document.querySelector('.topbar h1').textContent = t('title');
+  document.getElementById('btnStart').textContent = t('start');
+  document.getElementById('btnRestart').textContent = t('restart');
+  document.getElementById('btnStop').textContent = t('stop');
+  const cards = document.querySelectorAll('.card');
+  cards[0].querySelector('h2').textContent = t('importTitle');
+  cards[0].querySelector('button').textContent = t('import');
+  cards[0].querySelector('.muted').textContent = t('protocolHint');
+  cards[1].querySelector('h2').innerHTML = `${t('nodeList')} (<span id="nodeCount">${(state.nodes || []).length}</span>)`;
+  const actionButtons = cards[1].querySelectorAll('.row button');
+  actionButtons[0].textContent = t('autoAssign');
+  actionButtons[1].textContent = t('testAll');
+  actionButtons[2].textContent = t('deleteSelected');
+  const th = document.querySelectorAll('thead th');
+  th[2].textContent = t('name');
+  th[3].textContent = t('protocol');
+  th[4].textContent = t('server');
+  th[5].textContent = t('localPort');
+  th[6].textContent = t('proxyAddr');
+  th[7].textContent = t('delay');
+  document.getElementById('emptyHint').textContent = t('empty');
+  cards[2].querySelector('h2').textContent = t('settings');
+  const labels = cards[2].querySelectorAll('label');
+  setLabelText(labels[0], t('mihomoPath'));
+  setLabelText(labels[1], t('basePort'));
+  labels[2].lastChild.nodeValue = ' ' + t('allowLan');
+  setLabelText(labels[3], t('xrayPath'));
+  cards[2].querySelector('button:not(.primary)').textContent = t('saveSettings');
+  cards[2].querySelector('button.primary').textContent = t('detectCores');
+  cards[2].querySelectorAll('.muted')[0].textContent = t('xhttpOnly');
+  cards[2].querySelectorAll('.muted')[1].textContent = t('settingsHint');
+  cards[3].querySelector('h2').textContent = t('logs');
+}
 
 // 从后端拉取最新状态并刷新整个界面
 async function refresh() {
   try {
     state = await (await fetch('/api/state')).json();
   } catch (e) { return; }
+  state.language = state.language || 'zh-CN';
+  applyI18n();
   renderTopbar();
   renderNodes();
   if (!settingsLoaded) {
@@ -216,7 +390,7 @@ async function refresh() {
 function renderTopbar() {
   const badge = document.getElementById('statusBadge');
   badge.className = 'badge ' + (state.running ? 'on' : 'off');
-  badge.textContent = state.running ? '服务运行中' : '服务未运行';
+  badge.textContent = state.running ? t('running') : t('stopped');
   document.getElementById('btnStart').style.display = state.running ? 'none' : '';
   document.getElementById('btnRestart').style.display = state.running ? '' : 'none';
   document.getElementById('btnStop').style.display = state.running ? '' : 'none';
@@ -232,17 +406,17 @@ function renderNodes() {
     const addr = n.port > 0 ? `127.0.0.1:${n.port}` : '';
     let delay = '';
     if (n.delayMs > 0) delay = `<span class="delay-ok">${n.delayMs} ms</span>`;
-    else if (n.delayMs === -1) delay = `<span class="delay-bad">失败</span>`;
-    const errLine = n.parseErr ? `<div class="err">解析失败: ${esc(n.parseErr)}</div>` : '';
+    else if (n.delayMs === -1) delay = `<span class="delay-bad">${t('failed')}</span>`;
+    const errLine = n.parseErr ? `<div class="err">${t('parseFailed')}: ${esc(n.parseErr)}</div>` : '';
     return `<tr>
       <td><input type="checkbox" class="rowChk" value="${n.id}"></td>
       <td class="muted">${i + 1}</td>
       <td>${esc(n.name)}${errLine}</td>
       <td><span class="proto ${n.protocol}">${n.protocol || '?'}</span></td>
       <td class="muted">${esc(n.server || '')}:${n.remote || ''}</td>
-      <td><input type="number" class="port-input" value="${n.port || ''}" placeholder="自动"
+      <td><input type="number" class="port-input" value="${n.port || ''}" placeholder="${t('auto')}"
             onchange="updatePort('${n.id}', this.value)"></td>
-      <td>${addr ? `<span class="addr" onclick="copyAddr('${addr}')">${addr}</span>` : '<span class="muted">未分配</span>'}</td>
+      <td>${addr ? `<span class="addr" onclick="copyAddr('${addr}')">${addr}</span>` : `<span class="muted">${t('unassigned')}</span>`}</td>
       <td>${delay}</td>
     </tr>`;
   });
@@ -254,12 +428,12 @@ function renderNodes() {
 // 批量导入分享链接
 async function importLinks() {
   const box = document.getElementById('importBox');
-  if (!box.value.trim()) { toast('请先粘贴分享链接', true); return; }
+  if (!box.value.trim()) { toast(t('pasteFirst'), true); return; }
   try {
     const r = await post('/api/import', { links: box.value });
-    let msg = `导入成功 ${r.added} 个`;
-    if (r.skipped) msg += `，跳过重复 ${r.skipped} 个`;
-    if (r.failed && r.failed.length) msg += `，失败 ${r.failed.length} 个（${r.failed[0]}）`;
+    let msg = `${t('importOk')} ${r.added}`;
+    if (r.skipped) msg += `, ${t('skipped')} ${r.skipped}`;
+    if (r.failed && r.failed.length) msg += `, ${t('failed')} ${r.failed.length} (${r.failed[0]})`;
     toast(msg, r.added === 0);
     if (r.added > 0) box.value = '';
     await refresh();
@@ -270,7 +444,7 @@ async function importLinks() {
 async function updatePort(id, value) {
   try {
     await post('/api/update', { id, port: parseInt(value) || 0, name: '' });
-    if (state.running) toast('端口已修改，点击"重启"按钮生效');
+    if (state.running) toast(t('changedRestart'));
     await refresh();
   } catch (e) { toast(e.message, true); }
 }
@@ -279,8 +453,8 @@ async function updatePort(id, value) {
 async function autoAssign() {
   try {
     const r = await post('/api/assign');
-    toast(`已为 ${r.assigned} 个节点分配端口`);
-    if (state.running && r.assigned > 0) toast('端口已分配，点击"重启"按钮生效');
+    toast(`${t('assigned')} ${r.assigned} ${t('assignedSuffix')}`);
+    if (state.running && r.assigned > 0) toast(t('assignedRestart'));
     await refresh();
   } catch (e) { toast(e.message, true); }
 }
@@ -291,7 +465,7 @@ async function startService() {
   btn.disabled = true;
   try {
     await post('/api/start');
-    toast('服务已启动');
+    toast(t('serviceStarted'));
   } catch (e) { toast(e.message, true); }
   btn.disabled = false;
   await refresh();
@@ -301,7 +475,7 @@ async function startService() {
 async function stopService() {
   try {
     await post('/api/stop');
-    toast('服务已停止');
+    toast(t('serviceStopped'));
   } catch (e) { toast(e.message, true); }
   await refresh();
 }
@@ -309,24 +483,24 @@ async function stopService() {
 // 测试全部节点延迟
 async function testAll() {
   const btn = document.getElementById('btnTest');
-  btn.disabled = true; btn.textContent = '测试中...';
+  btn.disabled = true; btn.textContent = t('testing');
   try {
     await post('/api/test');
-    toast('测试完成');
+    toast(t('testDone'));
   } catch (e) { toast(e.message, true); }
-  btn.disabled = false; btn.textContent = '测试全部延迟';
+  btn.disabled = false; btn.textContent = t('testAll');
   await refresh();
 }
 
 // 删除勾选的节点
 async function deleteSelected() {
   const ids = [...document.querySelectorAll('.rowChk:checked')].map(c => c.value);
-  if (!ids.length) { toast('请先勾选要删除的节点', true); return; }
-  if (!confirm(`确定删除选中的 ${ids.length} 个节点？`)) return;
+  if (!ids.length) { toast(t('chooseDelete'), true); return; }
+  if (!confirm(`${t('confirmDeletePrefix')} ${ids.length} ${t('confirmDeleteSuffix')}`)) return;
   try {
     const r = await post('/api/delete', { ids });
-    toast(`已删除 ${r.removed} 个节点`);
-    if (state.running) toast('节点已删除，点击"重启"按钮生效');
+    toast(`${t('deletedPrefix')} ${r.removed} ${t('deletedSuffix')}`);
+    if (state.running) toast(t('deletedRestart'));
     document.getElementById('chkAll').checked = false;
     await refresh();
   } catch (e) { toast(e.message, true); }
@@ -340,8 +514,8 @@ function toggleAll(chk) {
 // 复制代理地址到剪贴板
 function copyAddr(addr) {
   navigator.clipboard.writeText(addr).then(
-    () => toast(`已复制 ${addr}（socks5 和 http 均可用）`),
-    () => toast('复制失败', true)
+    () => toast(`${addr} ${t('copiedSuffix')}`),
+    () => toast(t('copyFailed'), true)
   );
 }
 
@@ -354,7 +528,7 @@ async function saveSettings() {
       basePort: parseInt(document.getElementById('setBasePort').value) || 20001,
       allowLan: document.getElementById('setAllowLan').checked,
     });
-    toast('设置已保存' + (state.running ? '，重启服务后生效' : ''));
+    toast(t('settingsSaved') + (state.running ? t('restartAfterSave') : ''));
     await refresh();
   } catch (e) { toast(e.message, true); }
 }
@@ -368,9 +542,9 @@ async function detectCores() {
     if (r.corePath) core.value = r.corePath;
     if (r.xrayPath) xray.value = r.xrayPath;
     if (r.corePath || r.xrayPath) {
-      toast('已探测到内核路径，确认无误后点"保存设置"');
+      toast(t('detected'));
     } else {
-      toast('未找到内核，请确认 v2rayN 正在运行，或手动粘贴路径', true);
+      toast(t('notDetected'), true);
     }
   } catch (e) { toast(e.message, true); }
 }
