@@ -90,6 +90,7 @@ const (
 	bsPushButton      = 0x00000000
 	bsDefPushButton   = 0x00000001
 	bsAutoCheckBox    = 0x00000003
+	bsGroupBox        = 0x00000007
 	ssLeft            = 0x00000000
 
 	defaultGuiFont = 17
@@ -107,6 +108,7 @@ const (
 	idSetTray  = 203 // 设置：最小化到托盘
 	idLangZh   = 204 // 设置：简体中文
 	idLangEn   = 205 // 设置：English
+	idSetClose = 206 // 设置：关闭设置窗口
 
 	// appWindowTitle 是 Edge --app 界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
 	// edgeWindowClass 是 Edge/Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
@@ -676,29 +678,51 @@ func showSettingsDialog() {
 	dlgClickedID = 0
 	dlgCheckHwnd = 0
 	hInstance, _, _ := procGetModuleHandleW.Call(0)
+	closeAction := traySt.GetCloseAction()
+	language := trayLanguage()
 	curText := map[string]string{
 		"ask":  trayText("每次都询问", "Ask every time"),
 		"exit": trayText("直接完全退出", "Exit directly"),
 		"tray": trayText("最小化到托盘", "Minimize to tray"),
-	}[traySt.GetCloseAction()]
-	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[trayLanguage()]
-	hwnd := createDlg(hInstance, trayText("设置", "Settings"), 470, 306)
+	}[closeAction]
+	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[language]
+	mark := func(on bool) string {
+		if on {
+			return "✓ "
+		}
+		return ""
+	}
+
+	hwnd := createDlg(hInstance, trayText("设置 - MultiPortProxy", "Settings - MultiPortProxy"), 540, 392)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("关闭按钮（X）行为：", "Close button (X) behavior:")+"\r\n"+trayText("当前设置：", "Current: ")+curText,
-		wsChild|wsVisible|ssLeft, 0, 22, 18, 420, 54)
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("每次都询问", "Ask every time"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 20, 82, 134, 38)
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("直接完全退出", "Exit directly"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 164, 82, 134, 38)
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("最小化到托盘", "Minimize to tray"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 308, 82, 134, 38)
+		trayText("应用偏好", "Application preferences")+"\r\n"+trayText("从托盘快速调整窗口关闭行为和界面语言。", "Quickly adjust close behavior and interface language from the tray."),
+		wsChild|wsVisible|ssLeft, 0, 24, 18, 486, 48)
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("关闭按钮行为", "Close button behavior"),
+		wsChild|wsVisible|bsGroupBox, 0, 20, 78, 490, 118)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("界面语言：", "Language: ")+"\r\n"+trayText("当前语言：", "Current: ")+curLang,
-		wsChild|wsVisible|ssLeft, 0, 22, 146, 420, 54)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "简体中文",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 92, 206, 134, 38)
-	dlgAddControl(hwnd, hInstance, "BUTTON", "English",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 244, 206, 134, 38)
+		trayText("当前：", "Current: ")+curText,
+		wsChild|wsVisible|ssLeft, 0, 42, 104, 420, 24)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "ask")+trayText("每次询问", "Ask"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 42, 134, 140, 36)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "exit")+trayText("直接退出", "Exit"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 200, 134, 140, 36)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "tray")+trayText("最小化托盘", "Tray"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 358, 134, 130, 36)
+
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("界面语言", "Interface language"),
+		wsChild|wsVisible|bsGroupBox, 0, 20, 210, 490, 92)
+	dlgAddControl(hwnd, hInstance, "STATIC",
+		trayText("当前：", "Current: ")+curLang,
+		wsChild|wsVisible|ssLeft, 0, 42, 236, 420, 24)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "zh-CN")+"简体中文",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 120, 264, 132, 34)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "en")+"English",
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 274, 264, 132, 34)
+	dlgAddControl(hwnd, hInstance, "STATIC",
+		trayText("选择会立即保存。语言切换后，托盘菜单和应用界面会自动使用新语言。", "Changes are saved immediately. Menus and the app UI will use the selected language."),
+		wsChild|wsVisible|ssLeft, 0, 24, 322, 356, 36)
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完成", "Done"),
+		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 390, 322, 100, 36)
 	runDlgModal(hwnd)
 	clicked := dlgClickedID
 	procDestroyWindow.Call(hwnd)
@@ -715,5 +739,7 @@ func showSettingsDialog() {
 	case idLangEn:
 		traySt.SetLanguage("en")
 		updateTrayTip()
+	case idSetClose:
+		return
 	}
 }
