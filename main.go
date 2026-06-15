@@ -158,7 +158,7 @@ func openBrowser(url string) {
 	}
 	lastBrowserOpenAt = time.Now()
 
-	choice := browserAuto
+	choice := browserSystem
 	if browserState != nil {
 		choice = browserState.GetBrowserChoice()
 	}

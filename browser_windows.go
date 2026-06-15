@@ -7,10 +7,9 @@ import (
 	"strings"
 )
 
-const (
-	browserAuto   = "auto"
-	browserSystem = "system"
-)
+// browserSystem 表示"跟随系统默认浏览器"。系统默认若不支持独立应用窗口，
+// 会自动回退到第一个支持应用窗口的浏览器（见 findInstalledBrowser）。
+const browserSystem = "system"
 
 type browserInfo struct {
 	ID      string
@@ -25,10 +24,9 @@ func normalizeBrowserChoice(choice string) string {
 	switch choice {
 	case "edge", "chrome", "firefox", "brave", "vivaldi", "opera":
 		return choice
-	case browserSystem:
-		return browserSystem
 	default:
-		return browserAuto
+		// 空串、旧的 "auto"、未知值统一按"跟随系统默认"处理
+		return browserSystem
 	}
 }
 
@@ -146,16 +144,11 @@ func findInstalledBrowser(choice string) (browserInfo, bool) {
 	choice = normalizeBrowserChoice(choice)
 	browsers := detectInstalledBrowsers()
 	switch choice {
-	case browserAuto:
-		return firstAppModeBrowser(browsers)
 	case browserSystem:
-		if browser, ok := systemDefaultBrowser(browsers); ok {
-			if browser.AppMode {
-				return browser, true
-			}
-			return firstAppModeBrowser(browsers)
+		if browser, ok := systemDefaultBrowser(browsers); ok && browser.AppMode {
+			return browser, true
 		}
-		return firstAppModeBrowser(browsers)
+		return firstAppModeBrowser(browsers) // 系统默认不支持应用窗口时回退
 	default:
 		for _, browser := range browsers {
 			if browser.ID == choice {

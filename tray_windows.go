@@ -92,6 +92,14 @@ const (
 	bsAutoCheckBox    = 0x00000003
 	bsGroupBox        = 0x00000007
 	ssLeft            = 0x00000000
+	wsVScroll         = 0x00200000
+	cbsDropDownList   = 0x00000003 // 下拉列表（只读，不可手输）
+
+	// 下拉框消息与通知码
+	cbAddString = 0x0143
+	cbSetCurSel = 0x014E
+	cbGetCurSel = 0x0147
+	cbnSelChange = 1
 
 	defaultGuiFont = 17
 	smCxScreen     = 0
@@ -109,9 +117,7 @@ const (
 	idLangZh        = 204 // 设置：简体中文
 	idLangEn        = 205 // 设置：English
 	idSetClose      = 206 // 设置：关闭设置窗口
-	idBrowserAuto   = 207 // 设置：独立应用窗口
-	idBrowserSystem = 208 // 设置：系统默认浏览器
-	idBrowserFirst  = 220 // 设置：已检测浏览器按钮起始 ID
+	idBrowserCombo  = 207 // 设置：界面浏览器下拉框
 
 	// appWindowTitle 是浏览器 app 模式界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
 	// chromiumWindowClass 是 Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
@@ -577,6 +583,13 @@ func dlgProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 		if id == idRemember {
 			return 0 // 勾选框：自动切换状态即可，不结束对话框
 		}
+		if id == idBrowserCombo {
+			// 浏览器下拉框：选中即保存，不结束对话框（lParam 为下拉框句柄）
+			if uint32(wparam)>>16 == cbnSelChange {
+				applyBrowserComboChoice(lparam)
+			}
+			return 0
+		}
 		// 仅置标志，窗口销毁推迟到调用方读取完勾选框状态后再做，
 		// 否则 DestroyWindow 会连带销毁勾选框，导致读不到"记住"状态
 		dlgClickedID = id
@@ -695,35 +708,24 @@ func showCloseDialog() (string, bool) {
 	}
 }
 
-func trayBrowserChoiceName(choice string, browsers []browserInfo, systemBrowser browserInfo, systemBrowserOK bool) string {
-	choice = normalizeBrowserChoice(choice)
-	if choice == browserAuto {
-		return trayText("自动选择（独立窗口）", "Auto-select (app window)")
-	}
-	if choice == browserSystem && systemBrowserOK {
-		return trayText("系统默认（", "System default (") + systemBrowser.Name + ")"
-	}
-	for _, browser := range browsers {
-		if browser.ID == choice {
-			return browser.Name
-		}
-	}
-	for _, browser := range knownBrowsers() {
-		if browser.ID == choice {
-			return browser.Name + trayText("（未检测到）", " (not detected)")
-		}
-	}
-	return trayText("自动选择（独立窗口）", "Auto-select (app window)")
+// settingsBrowserChoices 把"界面浏览器"下拉框的每个表项索引映射到对应的 BrowserChoice 值。
+// 索引 0 固定是"跟随系统默认"，其后依次是各个支持应用窗口的浏览器。
+var settingsBrowserChoices []string
+
+// comboAddString 向下拉框追加一个表项
+func comboAddString(combo syscall.Handle, text string) {
+	procSendMessageW.Call(uintptr(combo), cbAddString, 0, uintptr(unsafe.Pointer(utf16Ptr(text))))
 }
 
-func trayBrowserShortName(browser browserInfo) string {
-	switch browser.ID {
-	case "edge":
-		return "Edge"
-	case "chrome":
-		return "Chrome"
-	default:
-		return browser.Name
+// applyBrowserComboChoice 在下拉框选择变化时读取当前选项并立即保存
+func applyBrowserComboChoice(comboHwnd uintptr) {
+	if traySt == nil {
+		return
+	}
+	idx, _, _ := procSendMessageW.Call(comboHwnd, cbGetCurSel, 0, 0)
+	i := int(idx)
+	if i >= 0 && i < len(settingsBrowserChoices) {
+		traySt.SetBrowserChoice(settingsBrowserChoices[i])
 	}
 }
 
@@ -739,20 +741,21 @@ func showSettingsDialog() {
 	installedBrowsers := detectInstalledBrowsers()
 	browsers := appModeBrowsers(installedBrowsers)
 	systemBrowser, systemBrowserOK := systemDefaultAppModeBrowser(installedBrowsers)
-	displayBrowserChoice := browserChoice
-	if browserChoice == browserSystem && !systemBrowserOK {
-		displayBrowserChoice = browserAuto
-	} else if browserChoice != browserAuto && browserChoice != browserSystem {
-		found := false
-		for _, browser := range browsers {
-			if browser.ID == browserChoice {
-				found = true
+	// 下拉框当前选中索引：0=跟随系统默认，其后依次是各浏览器；
+	// 若保存的浏览器已不可用则回退到"跟随系统默认"。
+	browserSel := 0
+	normChoice := normalizeBrowserChoice(browserChoice)
+	if normChoice != browserSystem {
+		for i, browser := range browsers {
+			if browser.ID == normChoice {
+				browserSel = i + 1
 				break
 			}
 		}
-		if !found {
-			displayBrowserChoice = browserAuto
-		}
+	}
+	systemLabel := trayText("跟随系统默认", "Use system default")
+	if systemBrowserOK {
+		systemLabel = trayText("跟随系统默认（", "System default (") + systemBrowser.Name + trayText("）", ")")
 	}
 	curText := map[string]string{
 		"ask":  trayText("每次都询问", "Ask every time"),
@@ -760,7 +763,6 @@ func showSettingsDialog() {
 		"tray": trayText("最小化到托盘", "Minimize to tray"),
 	}[closeAction]
 	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[language]
-	curBrowser := trayBrowserChoiceName(displayBrowserChoice, browsers, systemBrowser, systemBrowserOK)
 	mark := func(on bool) string {
 		if on {
 			return "✓ "
@@ -768,10 +770,12 @@ func showSettingsDialog() {
 		return ""
 	}
 
-	hwnd := createDlg(hInstance, trayText("设置 - MultiPortProxy", "Settings - MultiPortProxy"), 620, 590)
+	hwnd := createDlg(hInstance, trayText("设置 - MultiPortProxy", "Settings - MultiPortProxy"), 620, 512)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("应用偏好", "Application preferences")+"\r\n"+trayText("从托盘快速调整窗口关闭行为、界面语言和加载浏览器。", "Quickly adjust close behavior, interface language, and browser from the tray."),
+		trayText("应用偏好", "Application preferences")+"\r\n"+trayText("从托盘快速调整窗口关闭行为、界面浏览器和界面语言。", "Quickly adjust close behavior, browser, and interface language from the tray."),
 		wsChild|wsVisible|ssLeft, 0, 24, 18, 540, 48)
+
+	// 关闭按钮行为（少量固定选项，保留按钮）
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("关闭按钮行为", "Close button behavior"),
 		wsChild|wsVisible|bsGroupBox, 0, 20, 76, 570, 110)
 	dlgAddControl(hwnd, hInstance, "STATIC",
@@ -784,43 +788,38 @@ func showSettingsDialog() {
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "tray")+trayText("最小化托盘", "Tray"),
 		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 394, 130, 150, 34)
 
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("加载浏览器", "Browser"),
-		wsChild|wsVisible|bsGroupBox, 0, 20, 202, 570, 176)
+	// 界面浏览器（可变长列表，用下拉框，避免平铺）
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("界面浏览器", "Browser"),
+		wsChild|wsVisible|bsGroupBox, 0, 20, 200, 570, 96)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("当前：", "Current: ")+curBrowser,
-		wsChild|wsVisible|ssLeft, 0, 42, 228, 500, 24)
-	dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserAuto)+trayText("自动选择", "Auto"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserAuto, 42, 258, 160, 34)
-	nextBrowserIdx := 1
-	if systemBrowserOK {
-		systemLabel := trayText("默认: ", "Default: ") + trayBrowserShortName(systemBrowser)
-		dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserSystem)+systemLabel,
-			wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserSystem, 220, 258, 160, 34)
-		nextBrowserIdx = 2
+		trayText("打开界面使用的浏览器：", "Browser used to open the interface:"),
+		wsChild|wsVisible|ssLeft, 0, 42, 228, 510, 22)
+	combo := dlgAddControl(hwnd, hInstance, "COMBOBOX", "",
+		wsChild|wsVisible|wsTabStop|wsVScroll|cbsDropDownList, idBrowserCombo, 42, 254, 320, 260)
+	settingsBrowserChoices = []string{browserSystem}
+	comboAddString(combo, systemLabel)
+	for _, browser := range browsers {
+		settingsBrowserChoices = append(settingsBrowserChoices, browser.ID)
+		comboAddString(combo, browser.Name)
 	}
-	for i, browser := range browsers {
-		idx := nextBrowserIdx
-		nextBrowserIdx++
-		x := 42 + (idx%3)*178
-		y := 258 + (idx/3)*38
-		dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browser.ID)+browser.Name,
-			wsChild|wsVisible|wsTabStop|bsPushButton, uintptr(idBrowserFirst+i), x, y, 160, 34)
-	}
+	procSendMessageW.Call(uintptr(combo), cbSetCurSel, uintptr(browserSel), 0)
 
+	// 界面语言（两个固定选项，保留按钮）
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("界面语言", "Interface language"),
-		wsChild|wsVisible|bsGroupBox, 0, 20, 396, 570, 92)
+		wsChild|wsVisible|bsGroupBox, 0, 20, 312, 570, 92)
 	dlgAddControl(hwnd, hInstance, "STATIC",
 		trayText("当前：", "Current: ")+curLang,
-		wsChild|wsVisible|ssLeft, 0, 42, 422, 500, 24)
+		wsChild|wsVisible|ssLeft, 0, 42, 338, 500, 24)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "zh-CN")+"简体中文",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 150, 450, 150, 34)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 150, 364, 150, 34)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "en")+"English",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 322, 450, 150, 34)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 322, 364, 150, 34)
+
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("选择会立即保存。这里只显示支持独立应用窗口的浏览器。", "Changes are saved immediately. Only browsers that support app windows are shown here."),
-		wsChild|wsVisible|ssLeft, 0, 24, 508, 430, 36)
+		trayText("选择会立即保存。下拉框只列出支持独立应用窗口的浏览器。", "Changes are saved immediately. The list only shows browsers that support app windows."),
+		wsChild|wsVisible|ssLeft, 0, 24, 422, 430, 36)
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完成", "Done"),
-		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 488, 508, 100, 36)
+		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 488, 420, 100, 36)
 	runDlgModal(hwnd)
 	clicked := dlgClickedID
 	procDestroyWindow.Call(hwnd)
@@ -837,18 +836,8 @@ func showSettingsDialog() {
 	case idLangEn:
 		traySt.SetLanguage("en")
 		updateTrayTip()
-	case idBrowserAuto:
-		traySt.SetBrowserChoice(browserAuto)
-	case idBrowserSystem:
-		traySt.SetBrowserChoice(browserSystem)
 	case idSetClose:
 		return
-	default:
-		if clicked >= idBrowserFirst {
-			i := int(clicked - idBrowserFirst)
-			if i >= 0 && i < len(browsers) {
-				traySt.SetBrowserChoice(browsers[i].ID)
-			}
-		}
 	}
+	// 注：界面浏览器在下拉框 CBN_SELCHANGE 时即时保存（见 applyBrowserComboChoice），此处无需处理。
 }
