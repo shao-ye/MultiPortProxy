@@ -695,13 +695,13 @@ func showCloseDialog() (string, bool) {
 	}
 }
 
-func trayBrowserChoiceName(choice string, browsers []browserInfo) string {
+func trayBrowserChoiceName(choice string, browsers []browserInfo, systemBrowserOK bool) string {
 	choice = normalizeBrowserChoice(choice)
 	if choice == browserAuto {
 		return trayText("独立应用窗口（推荐）", "App window (recommended)")
 	}
-	if choice == browserSystem {
-		return trayText("系统默认浏览器（普通标签页）", "System default browser (regular tab)")
+	if choice == browserSystem && systemBrowserOK {
+		return trayText("系统默认浏览器独立窗口", "System default browser app window")
 	}
 	for _, browser := range browsers {
 		if browser.ID == choice {
@@ -725,14 +725,31 @@ func showSettingsDialog() {
 	closeAction := traySt.GetCloseAction()
 	language := trayLanguage()
 	browserChoice := traySt.GetBrowserChoice()
-	browsers := detectInstalledBrowsers()
+	installedBrowsers := detectInstalledBrowsers()
+	browsers := appModeBrowsers(installedBrowsers)
+	systemBrowser, systemBrowserOK := systemDefaultAppModeBrowser(installedBrowsers)
+	displayBrowserChoice := browserChoice
+	if browserChoice == browserSystem && !systemBrowserOK {
+		displayBrowserChoice = browserAuto
+	} else if browserChoice != browserAuto && browserChoice != browserSystem {
+		found := false
+		for _, browser := range browsers {
+			if browser.ID == browserChoice {
+				found = true
+				break
+			}
+		}
+		if !found {
+			displayBrowserChoice = browserAuto
+		}
+	}
 	curText := map[string]string{
 		"ask":  trayText("每次都询问", "Ask every time"),
 		"exit": trayText("直接完全退出", "Exit directly"),
 		"tray": trayText("最小化到托盘", "Minimize to tray"),
 	}[closeAction]
 	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[language]
-	curBrowser := trayBrowserChoiceName(browserChoice, browsers)
+	curBrowser := trayBrowserChoiceName(displayBrowserChoice, browsers, systemBrowserOK)
 	mark := func(on bool) string {
 		if on {
 			return "✓ "
@@ -761,15 +778,23 @@ func showSettingsDialog() {
 	dlgAddControl(hwnd, hInstance, "STATIC",
 		trayText("当前：", "Current: ")+curBrowser,
 		wsChild|wsVisible|ssLeft, 0, 42, 228, 500, 24)
-	dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browserAuto)+trayText("独立窗口", "App window"),
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserAuto)+trayText("独立窗口", "App window"),
 		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserAuto, 42, 258, 160, 34)
-	dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browserSystem)+trayText("系统默认", "System default"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserSystem, 220, 258, 160, 34)
+	nextBrowserIdx := 1
+	if systemBrowserOK {
+		dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserSystem)+trayText("系统默认", "System default"),
+			wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserSystem, 220, 258, 160, 34)
+		nextBrowserIdx = 2
+	}
 	for i, browser := range browsers {
-		idx := i + 2
+		if systemBrowserOK && browser.ID == systemBrowser.ID {
+			continue
+		}
+		idx := nextBrowserIdx
+		nextBrowserIdx++
 		x := 42 + (idx%3)*178
 		y := 258 + (idx/3)*38
-		dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browser.ID)+browser.Name,
+		dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browser.ID)+browser.Name,
 			wsChild|wsVisible|wsTabStop|bsPushButton, uintptr(idBrowserFirst+i), x, y, 160, 34)
 	}
 
@@ -783,7 +808,7 @@ func showSettingsDialog() {
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "en")+"English",
 		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 322, 450, 150, 34)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("选择会立即保存。默认保持独立应用窗口；系统默认浏览器会打开普通标签页。", "Changes are saved immediately. Default keeps the app window; system default opens a regular tab."),
+		trayText("选择会立即保存。这里只显示支持独立应用窗口的浏览器。", "Changes are saved immediately. Only browsers that support app windows are shown here."),
 		wsChild|wsVisible|ssLeft, 0, 24, 508, 430, 36)
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完成", "Done"),
 		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 488, 508, 100, 36)

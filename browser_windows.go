@@ -2,7 +2,9 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -130,25 +132,119 @@ func detectInstalledBrowsers() []browserInfo {
 	return installed
 }
 
+func appModeBrowsers(browsers []browserInfo) []browserInfo {
+	var appBrowsers []browserInfo
+	for _, browser := range browsers {
+		if browser.AppMode {
+			appBrowsers = append(appBrowsers, browser)
+		}
+	}
+	return appBrowsers
+}
+
 func findInstalledBrowser(choice string) (browserInfo, bool) {
 	choice = normalizeBrowserChoice(choice)
-	if choice == browserSystem {
+	browsers := detectInstalledBrowsers()
+	switch choice {
+	case browserAuto:
+		return firstAppModeBrowser(browsers)
+	case browserSystem:
+		if browser, ok := systemDefaultBrowser(browsers); ok {
+			if browser.AppMode {
+				return browser, true
+			}
+			return firstAppModeBrowser(browsers)
+		}
+		return firstAppModeBrowser(browsers)
+	default:
+		for _, browser := range browsers {
+			if browser.ID == choice {
+				if browser.AppMode {
+					return browser, true
+				}
+				return firstAppModeBrowser(browsers)
+			}
+		}
 		return browserInfo{}, false
 	}
-	for _, browser := range detectInstalledBrowsers() {
-		if choice == browserAuto && browser.AppMode {
-			return browser, true
-		}
-		if browser.ID == choice {
+}
+
+func firstAppModeBrowser(browsers []browserInfo) (browserInfo, bool) {
+	for _, browser := range browsers {
+		if browser.AppMode {
 			return browser, true
 		}
 	}
 	return browserInfo{}, false
 }
 
+func systemDefaultBrowser(browsers []browserInfo) (browserInfo, bool) {
+	id := detectSystemDefaultBrowserID()
+	if id == "" {
+		return browserInfo{}, false
+	}
+	for _, browser := range browsers {
+		if browser.ID == id {
+			return browser, true
+		}
+	}
+	return browserInfo{}, false
+}
+
+func systemDefaultAppModeBrowser(browsers []browserInfo) (browserInfo, bool) {
+	browser, ok := systemDefaultBrowser(browsers)
+	if !ok || !browser.AppMode {
+		return browserInfo{}, false
+	}
+	return browser, true
+}
+
+func detectSystemDefaultBrowserID() string {
+	for _, scheme := range []string{"https", "http"} {
+		key := `HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\` + scheme + `\UserChoice`
+		cmd := exec.Command("reg", "query", key, "/v", "ProgId")
+		hideWindow(cmd)
+		out, err := cmd.Output()
+		if err != nil {
+			continue
+		}
+		if id := browserIDFromProgID(string(out)); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+func browserIDFromProgID(output string) string {
+	fields := strings.Fields(output)
+	for i, field := range fields {
+		if strings.EqualFold(field, "REG_SZ") && i+1 < len(fields) {
+			progID := strings.ToLower(fields[i+1])
+			switch {
+			case strings.Contains(progID, "msedge") || strings.Contains(progID, "microsoftedge"):
+				return "edge"
+			case strings.Contains(progID, "chrome"):
+				return "chrome"
+			case strings.Contains(progID, "brave"):
+				return "brave"
+			case strings.Contains(progID, "vivaldi"):
+				return "vivaldi"
+			case strings.Contains(progID, "opera"):
+				return "opera"
+			case strings.Contains(progID, "firefox"):
+				return "firefox"
+			}
+		}
+	}
+	return ""
+}
+
 func browserArgs(browser browserInfo, url string) []string {
 	if browser.AppMode {
 		return []string{"--app=" + url}
+	}
+	if browser.ExeName == "firefox.exe" {
+		return []string{"--new-window", url}
 	}
 	return []string{url}
 }
