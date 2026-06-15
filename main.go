@@ -9,8 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -111,25 +109,10 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
-// edgePIDs 记录本应用启动的 Edge 进程 PID，供"完全退出"时关闭界面窗口
-var (
-	edgeMu   sync.Mutex
-	edgePIDs []int
-)
-
-// edgeProfileDir 返回本应用专用的 Edge 用户数据目录。
-// 用独立目录启动 --app 窗口，可让它成为单独的 Edge 进程，
-// 既与用户日常的 Edge 互不干扰，也便于"完全退出"时精确关闭本应用窗口。
-func edgeProfileDir() string {
-	base := os.Getenv("LOCALAPPDATA")
-	if base == "" {
-		base = os.TempDir()
-	}
-	return filepath.Join(base, "NodePortProxy", "EdgeProfile")
-}
-
 // openBrowser 优先用 Edge 的应用模式打开（独立窗口、无地址栏，更像桌面应用），
-// 找不到 Edge 时退回系统默认浏览器
+// 找不到 Edge 时退回系统默认浏览器。
+// 不指定 --user-data-dir：沿用用户默认 Edge 配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
+// "完全退出"时由 closeAppWindows 按窗口标题精确关闭本应用窗口（见 tray_windows.go）。
 func openBrowser(url string) {
 	edges := []string{
 		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
@@ -137,33 +120,11 @@ func openBrowser(url string) {
 	}
 	for _, edge := range edges {
 		if _, err := os.Stat(edge); err == nil {
-			// --user-data-dir 隔离出独立的 Edge 实例；--no-first-run 等避免新配置目录的首启提示
-			cmd := exec.Command(edge, "--app="+url,
-				"--user-data-dir="+edgeProfileDir(),
-				"--no-first-run", "--no-default-browser-check")
+			cmd := exec.Command(edge, "--app="+url)
 			if cmd.Start() == nil {
-				edgeMu.Lock()
-				edgePIDs = append(edgePIDs, cmd.Process.Pid)
-				edgeMu.Unlock()
 				return
 			}
 		}
 	}
 	_ = exec.Command("cmd", "/c", "start", "", url).Start()
-}
-
-// closeAppWindows 关闭本应用打开的所有 Edge --app 窗口（"完全退出"时调用）。
-// taskkill 附带 IMAGENAME 过滤，确保只结束 msedge 进程，避免 PID 被系统复用后误杀其它程序；
-// 配合独立的 user-data-dir，这里只会关掉本应用的界面窗口，不影响用户日常浏览器。
-func closeAppWindows() {
-	edgeMu.Lock()
-	pids := append([]int(nil), edgePIDs...)
-	edgeMu.Unlock()
-	for _, pid := range pids {
-		cmd := exec.Command("taskkill", "/F", "/T",
-			"/FI", fmt.Sprintf("PID eq %d", pid),
-			"/FI", "IMAGENAME eq msedge.exe")
-		hideWindow(cmd) // 不弹控制台黑窗
-		_ = cmd.Run()
-	}
 }

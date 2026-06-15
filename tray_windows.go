@@ -43,6 +43,10 @@ var (
 	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
+
+	procEnumWindows    = user32.NewProc("EnumWindows")
+	procGetWindowTextW = user32.NewProc("GetWindowTextW")
+	procGetClassNameW  = user32.NewProc("GetClassNameW")
 )
 
 // ---------- 常量 ----------
@@ -51,10 +55,16 @@ const (
 	wmTrayCallback   = wmApp + 1 // 托盘图标的鼠标事件回调消息
 	wmShowCloseTip   = wmApp + 2 // 自定义消息：在托盘线程弹出"已最小化"气泡
 
+	wmClose         = 0x0010
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
 	wmRButtonUp     = 0x0205
 	wmDestroy       = 0x0002
+
+	// appWindowTitle 是 Edge --app 界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
+	appWindowTitle = "多节点端口代理"
+	// edgeWindowClass 是 Edge/Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
+	edgeWindowClass = "Chrome_WidgetWin_1"
 
 	nimAdd    = 0x0000
 	nimModify = 0x0001
@@ -242,6 +252,40 @@ func trayExit() {
 	closeAppWindows() // Edge --app 窗口是独立进程，需主动关闭，否则会残留空壳窗口
 	core.Stop()
 	os.Exit(0)
+}
+
+// enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄
+var enumFoundWindows []syscall.Handle
+
+// enumWindowsProc 是 EnumWindows 的回调：按"标题 + 窗口类"精确匹配本应用的 Edge --app 窗口。
+// 标题取自网页 <title>，窗口类用 Chrome_WidgetWin_1 以排除本应用自己的隐藏托盘窗口（同标题不同类）。
+func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
+	var title [256]uint16
+	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&title[0])), uintptr(len(title)))
+	if syscall.UTF16ToString(title[:]) != appWindowTitle {
+		return 1 // 继续枚举
+	}
+	var cls [128]uint16
+	procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&cls[0])), uintptr(len(cls)))
+	if syscall.UTF16ToString(cls[:]) != edgeWindowClass {
+		return 1
+	}
+	enumFoundWindows = append(enumFoundWindows, syscall.Handle(hwnd))
+	return 1
+}
+
+var enumWindowsProcCB = syscall.NewCallback(enumWindowsProc)
+
+// closeAppWindows 关闭本应用的 Edge --app 界面窗口（"完全退出"时调用）。
+// 用 PostMessage(WM_CLOSE) 只关闭匹配到的那个浏览器窗口，既不结束 Edge 进程、
+// 也不影响用户的其它 Edge 窗口或标签页。PostMessage 是投递到 Edge 进程的消息队列，
+// 即便本进程随后 os.Exit，Edge 也会照常处理该消息关闭窗口。
+func closeAppWindows() {
+	enumFoundWindows = nil
+	procEnumWindows.Call(enumWindowsProcCB, 0)
+	for _, h := range enumFoundWindows {
+		procPostMessageW.Call(uintptr(h), wmClose, 0, 0)
+	}
 }
 
 // trayOnUIClose 由 /api/ui-closed 在界面窗口关闭时调用：首次关闭弹气泡提示。
