@@ -54,7 +54,7 @@ v2rayN / Clash 这类客户端通常只暴露一个固定的本地端口，所�
 
 ### 使用步骤
 
-1. 从 [Releases](../../releases) 下载 `NodePortProxy.exe`（或自行编译，见下），双击运行，会自动弹出界面。
+1. 从 [Releases](../../releases) 下载 `MultiPortProxy.exe`（或自行编译，见下），双击运行，会自动弹出界面。
 2. 在 v2rayN 中选中节点 → 右键 → 分享 → **复制分享链接到剪贴板**。
 3. 粘贴到应用顶部的导入框 → 点击**导入**（支持多行批量）。
 4. 点击**自动分配端口**（默认从 20001 起递增），或在表格中手动指定端口。
@@ -69,7 +69,7 @@ v2rayN / Clash 这类客户端通常只暴露一个固定的本地端口，所�
 ```bash
 git clone https://github.com/<your-name>/MultiPortProxy.git
 cd MultiPortProxy
-go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
+go build -ldflags "-H windowsgui" -o MultiPortProxy.exe .
 ```
 
 仅依赖 Go 标准库。`-H windowsgui` 表示运行时不显示控制台黑窗口。
@@ -126,7 +126,7 @@ A small Windows desktop tool that maps multiple proxy nodes to **separate local 
 ### Build
 
 ```bash
-go build -ldflags "-H windowsgui" -o NodePortProxy.exe .
+go build -ldflags "-H windowsgui" -o MultiPortProxy.exe .
 ```
 
 Pure Go standard library, no third-party dependencies.

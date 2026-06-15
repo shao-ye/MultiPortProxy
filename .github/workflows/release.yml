@@ -34,22 +34,22 @@ jobs:
           CGO_ENABLED: '0'
         # -H windowsgui：运行时不弹控制台黑窗口；-s -w：去符号表减小体积
         # 同目录的 resource_windows_amd64.syso 会被 go build 自动嵌入
-        run: go build -ldflags "-H windowsgui -s -w" -o NodePortProxy.exe .
+        run: go build -ldflags "-H windowsgui -s -w" -o MultiPortProxy.exe .
 
       - name: 打包发布物
         run: |
           mkdir -p dist
-          cp NodePortProxy.exe dist/
+          cp MultiPortProxy.exe dist/
           cp README.md dist/
           cp state.example.json dist/
           cp LICENSE dist/
-          cd dist && zip -r "../NodePortProxy-${GITHUB_REF_NAME}-windows-amd64.zip" .
+          cd dist && zip -r "../MultiPortProxy-${GITHUB_REF_NAME}-windows-amd64.zip" .
 
       - name: 创建 Release 并上传产物
         uses: softprops/action-gh-release@v2
         with:
           # 同时提供裸 exe 和打包 zip，方便不同需求下载
           files: |
-            NodePortProxy.exe
-            NodePortProxy-*-windows-amd64.zip
+            MultiPortProxy.exe
+            MultiPortProxy-*-windows-amd64.zip
           generate_release_notes: true   # 自动根据提交生成发布说明

@@ -4,7 +4,7 @@ runtime/
 
 # 编译产物
 *.exe
-NodePortProxy
+MultiPortProxy
 dist/
 
 # 内核（请自行从 v2rayN 复用，禁止打包进仓库）
