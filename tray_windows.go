@@ -46,10 +46,11 @@ var (
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 
-	procEnumWindows     = user32.NewProc("EnumWindows")
-	procGetWindowTextW  = user32.NewProc("GetWindowTextW")
-	procGetClassNameW   = user32.NewProc("GetClassNameW")
-	procIsWindowVisible = user32.NewProc("IsWindowVisible")
+	procEnumWindows              = user32.NewProc("EnumWindows")
+	procGetWindowTextW           = user32.NewProc("GetWindowTextW")
+	procGetClassNameW            = user32.NewProc("GetClassNameW")
+	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
+	procGetWindowThreadProcessID = user32.NewProc("GetWindowThreadProcessId")
 
 	// 自定义对话框（关闭询问 / 设置）所需
 	procDestroyWindow    = user32.NewProc("DestroyWindow")
@@ -330,6 +331,27 @@ func trayExit() {
 // enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄
 var enumFoundWindows []syscall.Handle
 
+func windowProcessBaseName(hwnd uintptr) string {
+	var pid uint32
+	procGetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	if pid == 0 {
+		return ""
+	}
+	const procQueryLimitedInformation = 0x1000
+	h, _, _ := procOpenProcess.Call(procQueryLimitedInformation, 0, uintptr(pid))
+	if h == 0 {
+		return ""
+	}
+	defer syscall.CloseHandle(syscall.Handle(h))
+	var buf [520]uint16
+	size := uint32(len(buf))
+	r, _, _ := procQueryFullProcessImageName.Call(h, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
+	if r == 0 {
+		return ""
+	}
+	return strings.ToLower(filepath.Base(syscall.UTF16ToString(buf[:size])))
+}
+
 // enumWindowsProc 是 EnumWindows 的回调：按"标题包含应用名 + Chrome/Edge 顶层窗口类"匹配本应用的 Edge --app 窗口。
 // Edge --app 的实际标题在不同版本/语言环境下可能带后缀，不能用完全相等判断。
 func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
@@ -344,6 +366,9 @@ func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&cls[0])), uintptr(len(cls)))
 	classText := syscall.UTF16ToString(cls[:])
 	if !strings.Contains(titleText, appWindowTitle) || !strings.HasPrefix(classText, edgeWindowClass) {
+		return 1
+	}
+	if windowProcessBaseName(hwnd) != "msedge.exe" {
 		return 1
 	}
 	enumFoundWindows = append(enumFoundWindows, syscall.Handle(hwnd))
