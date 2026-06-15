@@ -695,13 +695,13 @@ func showCloseDialog() (string, bool) {
 	}
 }
 
-func trayBrowserChoiceName(choice string, browsers []browserInfo, systemBrowserOK bool) string {
+func trayBrowserChoiceName(choice string, browsers []browserInfo, systemBrowser browserInfo, systemBrowserOK bool) string {
 	choice = normalizeBrowserChoice(choice)
 	if choice == browserAuto {
-		return trayText("独立应用窗口（推荐）", "App window (recommended)")
+		return trayText("自动选择（独立窗口）", "Auto-select (app window)")
 	}
 	if choice == browserSystem && systemBrowserOK {
-		return trayText("系统默认浏览器独立窗口", "System default browser app window")
+		return trayText("系统默认（", "System default (") + systemBrowser.Name + ")"
 	}
 	for _, browser := range browsers {
 		if browser.ID == choice {
@@ -713,7 +713,18 @@ func trayBrowserChoiceName(choice string, browsers []browserInfo, systemBrowserO
 			return browser.Name + trayText("（未检测到）", " (not detected)")
 		}
 	}
-	return trayText("独立应用窗口（推荐）", "App window (recommended)")
+	return trayText("自动选择（独立窗口）", "Auto-select (app window)")
+}
+
+func trayBrowserShortName(browser browserInfo) string {
+	switch browser.ID {
+	case "edge":
+		return "Edge"
+	case "chrome":
+		return "Chrome"
+	default:
+		return browser.Name
+	}
 }
 
 // showSettingsDialog 弹出"设置"对话框，修改关闭按钮(X)、界面语言和加载浏览器。
@@ -749,7 +760,7 @@ func showSettingsDialog() {
 		"tray": trayText("最小化到托盘", "Minimize to tray"),
 	}[closeAction]
 	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[language]
-	curBrowser := trayBrowserChoiceName(displayBrowserChoice, browsers, systemBrowserOK)
+	curBrowser := trayBrowserChoiceName(displayBrowserChoice, browsers, systemBrowser, systemBrowserOK)
 	mark := func(on bool) string {
 		if on {
 			return "✓ "
@@ -778,18 +789,16 @@ func showSettingsDialog() {
 	dlgAddControl(hwnd, hInstance, "STATIC",
 		trayText("当前：", "Current: ")+curBrowser,
 		wsChild|wsVisible|ssLeft, 0, 42, 228, 500, 24)
-	dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserAuto)+trayText("独立窗口", "App window"),
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserAuto)+trayText("自动选择", "Auto"),
 		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserAuto, 42, 258, 160, 34)
 	nextBrowserIdx := 1
 	if systemBrowserOK {
-		dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserSystem)+trayText("系统默认", "System default"),
+		systemLabel := trayText("默认: ", "Default: ") + trayBrowserShortName(systemBrowser)
+		dlgAddControl(hwnd, hInstance, "BUTTON", mark(displayBrowserChoice == browserSystem)+systemLabel,
 			wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserSystem, 220, 258, 160, 34)
 		nextBrowserIdx = 2
 	}
 	for i, browser := range browsers {
-		if systemBrowserOK && browser.ID == systemBrowser.ID {
-			continue
-		}
 		idx := nextBrowserIdx
 		nextBrowserIdx++
 		x := 42 + (idx%3)*178
