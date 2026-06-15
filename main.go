@@ -21,12 +21,17 @@ var webFS embed.FS
 const uiPort = 23456
 
 var (
-	browserOpenMu     sync.Mutex
-	lastBrowserOpenAt time.Time
+	browserOpenMu       sync.Mutex
+	lastBrowserOpenAt   time.Time
+	browserState        *AppState
+	activeAppBrowserExe string
 )
 
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口
 func main() {
+	st := LoadState()
+	browserState = st
+
 	if release, alreadyRunning := acquireSingleInstance(); alreadyRunning {
 		for i := 0; i < 20; i++ {
 			if openExistingInstance() {
@@ -38,8 +43,6 @@ func main() {
 	} else {
 		defer release()
 	}
-
-	st := LoadState()
 
 	// 单实例检测：如果端口上已经跑着本应用，直接打开浏览器并退出
 	port := uiPort
@@ -139,9 +142,9 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
-// openBrowser 优先用 Edge 的应用模式打开（独立窗口、无地址栏，更像桌面应用），
-// 找不到 Edge 时退回系统默认浏览器。
-// 不指定 --user-data-dir：沿用用户默认 Edge 配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
+// openBrowser 默认用系统默认浏览器打开；用户在托盘设置中指定浏览器时，
+// 对 Chromium 系浏览器使用应用模式打开（独立窗口、无地址栏，更像桌面应用）。
+// 不指定 --user-data-dir：沿用用户默认浏览器配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
 // "完全退出"时由 closeAppWindows 按窗口标题精确关闭本应用窗口（见 tray_windows.go）。
 func openBrowser(url string) {
 	browserOpenMu.Lock()
@@ -155,16 +158,17 @@ func openBrowser(url string) {
 	}
 	lastBrowserOpenAt = time.Now()
 
-	edges := []string{
-		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
-		`C:\Program Files\Microsoft\Edge\Application\msedge.exe`,
+	choice := browserDefault
+	if browserState != nil {
+		choice = browserState.GetBrowserChoice()
 	}
-	for _, edge := range edges {
-		if _, err := os.Stat(edge); err == nil {
-			cmd := exec.Command(edge, "--app="+url)
-			if cmd.Start() == nil {
-				return
+	if browser, ok := findInstalledBrowser(choice); ok {
+		cmd := exec.Command(browser.Path, browserArgs(browser, url)...)
+		if cmd.Start() == nil {
+			if browser.AppMode {
+				activeAppBrowserExe = browser.ExeName
 			}
+			return
 		}
 	}
 	_ = exec.Command("cmd", "/c", "start", "", url).Start()

@@ -45,16 +45,19 @@ type AppState struct {
 	CloseAction string `json:"closeAction"`
 	// Language 决定托盘菜单、原生弹窗和网页界面的显示语言："zh-CN" 或 "en"。空串按 "zh-CN" 处理。
 	Language string `json:"language"`
-	file     string // 持久化文件路径
+	// BrowserChoice 决定托盘打开界面时使用的浏览器："default"=系统默认浏览器，或检测到的浏览器 ID。
+	BrowserChoice string `json:"browserChoice"`
+	file          string // 持久化文件路径
 }
 
 // persistedState 是写入磁盘的精简结构（节点只保留必要字段）
 type persistedState struct {
-	Settings    Settings `json:"settings"`
-	AutoStart   bool     `json:"autoStart"`
-	CloseAction string   `json:"closeAction"`
-	Language    string   `json:"language"`
-	Nodes       []struct {
+	Settings      Settings `json:"settings"`
+	AutoStart     bool     `json:"autoStart"`
+	CloseAction   string   `json:"closeAction"`
+	Language      string   `json:"language"`
+	BrowserChoice string   `json:"browserChoice"`
+	Nodes         []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 		Link string `json:"link"`
@@ -98,6 +101,21 @@ func (st *AppState) GetLanguage() string {
 func (st *AppState) SetLanguage(language string) {
 	st.mu.Lock()
 	st.Language = normalizeLanguage(language)
+	_ = st.saveLocked()
+	st.mu.Unlock()
+}
+
+// GetBrowserChoice 返回当前界面加载浏览器；未设置时默认使用系统默认浏览器。
+func (st *AppState) GetBrowserChoice() string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return normalizeBrowserChoice(st.BrowserChoice)
+}
+
+// SetBrowserChoice 设置界面加载浏览器并立即持久化。
+func (st *AppState) SetBrowserChoice(choice string) {
+	st.mu.Lock()
+	st.BrowserChoice = normalizeBrowserChoice(choice)
 	_ = st.saveLocked()
 	st.mu.Unlock()
 }
@@ -179,6 +197,7 @@ func LoadState() *AppState {
 	st.AutoStart = ps.AutoStart
 	st.CloseAction = ps.CloseAction
 	st.Language = normalizeLanguage(ps.Language)
+	st.BrowserChoice = normalizeBrowserChoice(ps.BrowserChoice)
 	// 如果保存的内核路径已失效，重新自动探测
 	if _, err := os.Stat(st.Settings.CorePath); err != nil {
 		st.Settings.CorePath = detectCorePath()
@@ -211,6 +230,7 @@ func (st *AppState) saveLocked() error {
 	ps.AutoStart = st.AutoStart
 	ps.CloseAction = st.CloseAction
 	ps.Language = normalizeLanguage(st.Language)
+	ps.BrowserChoice = normalizeBrowserChoice(st.BrowserChoice)
 	for _, n := range st.Nodes {
 		ps.Nodes = append(ps.Nodes, struct {
 			ID   string `json:"id"`

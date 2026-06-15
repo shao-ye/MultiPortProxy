@@ -100,19 +100,21 @@ const (
 	swRestore      = 9
 
 	// 对话框控件 ID
-	idExitBtn  = 101 // 关闭询问：完全退出
-	idTrayBtn  = 102 // 关闭询问：最小化到托盘
-	idRemember = 103 // 关闭询问：记住选择 勾选框
-	idSetAsk   = 201 // 设置：每次都询问
-	idSetExit  = 202 // 设置：直接完全退出
-	idSetTray  = 203 // 设置：最小化到托盘
-	idLangZh   = 204 // 设置：简体中文
-	idLangEn   = 205 // 设置：English
-	idSetClose = 206 // 设置：关闭设置窗口
+	idExitBtn        = 101 // 关闭询问：完全退出
+	idTrayBtn        = 102 // 关闭询问：最小化到托盘
+	idRemember       = 103 // 关闭询问：记住选择 勾选框
+	idSetAsk         = 201 // 设置：每次都询问
+	idSetExit        = 202 // 设置：直接完全退出
+	idSetTray        = 203 // 设置：最小化到托盘
+	idLangZh         = 204 // 设置：简体中文
+	idLangEn         = 205 // 设置：English
+	idSetClose       = 206 // 设置：关闭设置窗口
+	idBrowserDefault = 207 // 设置：系统默认浏览器
+	idBrowserFirst   = 220 // 设置：已检测浏览器按钮起始 ID
 
-	// appWindowTitle 是 Edge --app 界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
-	// edgeWindowClass 是 Edge/Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
-	edgeWindowClass = "Chrome_WidgetWin_1"
+	// appWindowTitle 是浏览器 app 模式界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
+	// chromiumWindowClass 是 Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
+	chromiumWindowClass = "Chrome_WidgetWin_1"
 
 	nimAdd    = 0x0000
 	nimModify = 0x0001
@@ -373,7 +375,10 @@ func trayExit() {
 }
 
 // enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄
-var enumFoundWindows []syscall.Handle
+var (
+	enumFoundWindows    []syscall.Handle
+	enumBrowserExeNames map[string]bool
+)
 
 func windowProcessBaseName(hwnd uintptr) string {
 	var pid uint32
@@ -396,8 +401,8 @@ func windowProcessBaseName(hwnd uintptr) string {
 	return strings.ToLower(filepath.Base(syscall.UTF16ToString(buf[:size])))
 }
 
-// enumWindowsProc 是 EnumWindows 的回调：按"标题包含应用名 + Chrome/Edge 顶层窗口类"匹配本应用的 Edge --app 窗口。
-// Edge --app 的实际标题在不同版本/语言环境下可能带后缀，不能用完全相等判断。
+// enumWindowsProc 是 EnumWindows 的回调：按"标题包含应用名 + Chromium 顶层窗口类 + 目标浏览器进程"匹配本应用窗口。
+// app 模式窗口的实际标题在不同版本/语言环境下可能带后缀，不能用完全相等判断。
 func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	visible, _, _ := procIsWindowVisible.Call(hwnd)
 	if visible == 0 {
@@ -409,10 +414,10 @@ func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	var cls [128]uint16
 	procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&cls[0])), uintptr(len(cls)))
 	classText := syscall.UTF16ToString(cls[:])
-	if !windowTitleMatchesApp(titleText) || !strings.HasPrefix(classText, edgeWindowClass) {
+	if !windowTitleMatchesApp(titleText) || !strings.HasPrefix(classText, chromiumWindowClass) {
 		return 1
 	}
-	if windowProcessBaseName(hwnd) != "msedge.exe" {
+	if !enumBrowserExeNames[windowProcessBaseName(hwnd)] {
 		return 1
 	}
 	enumFoundWindows = append(enumFoundWindows, syscall.Handle(hwnd))
@@ -423,8 +428,25 @@ var enumWindowsProcCB = syscall.NewCallback(enumWindowsProc)
 
 func appWindows() []syscall.Handle {
 	enumFoundWindows = nil
+	enumBrowserExeNames = browserAppWindowExeNames()
+	if len(enumBrowserExeNames) == 0 {
+		return nil
+	}
 	procEnumWindows.Call(enumWindowsProcCB, 0)
 	return append([]syscall.Handle(nil), enumFoundWindows...)
+}
+
+func browserAppWindowExeNames() map[string]bool {
+	names := map[string]bool{}
+	if activeAppBrowserExe != "" {
+		names[strings.ToLower(activeAppBrowserExe)] = true
+	}
+	if browserState != nil {
+		if browser, ok := findInstalledBrowser(browserState.GetBrowserChoice()); ok && browser.AppMode {
+			names[strings.ToLower(browser.ExeName)] = true
+		}
+	}
+	return names
 }
 
 func showAppWindow() bool {
@@ -448,10 +470,10 @@ func showOrOpenAppWindow(url string) {
 	openBrowser(url)
 }
 
-// closeAppWindows 关闭本应用的 Edge --app 界面窗口（"完全退出"时调用）。
-// 用 PostMessage(WM_CLOSE) 只关闭匹配到的那个浏览器窗口，既不结束 Edge 进程、
-// 也不影响用户的其它 Edge 窗口或标签页。PostMessage 是投递到 Edge 进程的消息队列，
-// 即便本进程随后 os.Exit，Edge 也会照常处理该消息关闭窗口。
+// closeAppWindows 关闭本应用的浏览器 app 模式界面窗口（"完全退出"时调用）。
+// 用 PostMessage(WM_CLOSE) 只关闭匹配到的那个浏览器窗口，既不结束浏览器进程、
+// 也不影响用户的其它浏览器窗口或标签页。PostMessage 是投递到浏览器进程的消息队列，
+// 即便本进程随后 os.Exit，浏览器也会照常处理该消息关闭窗口。
 func closeAppWindows() {
 	for _, h := range appWindows() {
 		procPostMessageW.Call(uintptr(h), wmClose, 0, 0)
@@ -672,7 +694,25 @@ func showCloseDialog() (string, bool) {
 	}
 }
 
-// showSettingsDialog 弹出"设置"对话框，修改关闭按钮(X)的默认行为
+func trayBrowserChoiceName(choice string, browsers []browserInfo) string {
+	choice = normalizeBrowserChoice(choice)
+	if choice == browserDefault {
+		return trayText("系统默认浏览器", "System default browser")
+	}
+	for _, browser := range browsers {
+		if browser.ID == choice {
+			return browser.Name
+		}
+	}
+	for _, browser := range knownBrowsers() {
+		if browser.ID == choice {
+			return browser.Name + trayText("（未检测到）", " (not detected)")
+		}
+	}
+	return trayText("系统默认浏览器", "System default browser")
+}
+
+// showSettingsDialog 弹出"设置"对话框，修改关闭按钮(X)、界面语言和加载浏览器。
 func showSettingsDialog() {
 	dlgDone = false
 	dlgClickedID = 0
@@ -680,12 +720,15 @@ func showSettingsDialog() {
 	hInstance, _, _ := procGetModuleHandleW.Call(0)
 	closeAction := traySt.GetCloseAction()
 	language := trayLanguage()
+	browserChoice := traySt.GetBrowserChoice()
+	browsers := detectInstalledBrowsers()
 	curText := map[string]string{
 		"ask":  trayText("每次都询问", "Ask every time"),
 		"exit": trayText("直接完全退出", "Exit directly"),
 		"tray": trayText("最小化到托盘", "Minimize to tray"),
 	}[closeAction]
 	curLang := map[string]string{"zh-CN": "简体中文", "en": "English"}[language]
+	curBrowser := trayBrowserChoiceName(browserChoice, browsers)
 	mark := func(on bool) string {
 		if on {
 			return "✓ "
@@ -693,36 +736,51 @@ func showSettingsDialog() {
 		return ""
 	}
 
-	hwnd := createDlg(hInstance, trayText("设置 - MultiPortProxy", "Settings - MultiPortProxy"), 540, 392)
+	hwnd := createDlg(hInstance, trayText("设置 - MultiPortProxy", "Settings - MultiPortProxy"), 620, 590)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("应用偏好", "Application preferences")+"\r\n"+trayText("从托盘快速调整窗口关闭行为和界面语言。", "Quickly adjust close behavior and interface language from the tray."),
-		wsChild|wsVisible|ssLeft, 0, 24, 18, 486, 48)
+		trayText("应用偏好", "Application preferences")+"\r\n"+trayText("从托盘快速调整窗口关闭行为、界面语言和加载浏览器。", "Quickly adjust close behavior, interface language, and browser from the tray."),
+		wsChild|wsVisible|ssLeft, 0, 24, 18, 540, 48)
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("关闭按钮行为", "Close button behavior"),
-		wsChild|wsVisible|bsGroupBox, 0, 20, 78, 490, 118)
+		wsChild|wsVisible|bsGroupBox, 0, 20, 76, 570, 110)
 	dlgAddControl(hwnd, hInstance, "STATIC",
 		trayText("当前：", "Current: ")+curText,
-		wsChild|wsVisible|ssLeft, 0, 42, 104, 420, 24)
+		wsChild|wsVisible|ssLeft, 0, 42, 102, 500, 24)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "ask")+trayText("每次询问", "Ask"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 42, 134, 140, 36)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetAsk, 42, 130, 150, 34)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "exit")+trayText("直接退出", "Exit"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 200, 134, 140, 36)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetExit, 218, 130, 150, 34)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(closeAction == "tray")+trayText("最小化托盘", "Tray"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 358, 134, 130, 36)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idSetTray, 394, 130, 150, 34)
+
+	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("加载浏览器", "Browser"),
+		wsChild|wsVisible|bsGroupBox, 0, 20, 202, 570, 176)
+	dlgAddControl(hwnd, hInstance, "STATIC",
+		trayText("当前：", "Current: ")+curBrowser,
+		wsChild|wsVisible|ssLeft, 0, 42, 228, 500, 24)
+	dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browserDefault)+trayText("系统默认", "System default"),
+		wsChild|wsVisible|wsTabStop|bsPushButton, idBrowserDefault, 42, 258, 160, 34)
+	for i, browser := range browsers {
+		idx := i + 1
+		x := 42 + (idx%3)*178
+		y := 258 + (idx/3)*38
+		dlgAddControl(hwnd, hInstance, "BUTTON", mark(browserChoice == browser.ID)+browser.Name,
+			wsChild|wsVisible|wsTabStop|bsPushButton, uintptr(idBrowserFirst+i), x, y, 160, 34)
+	}
 
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("界面语言", "Interface language"),
-		wsChild|wsVisible|bsGroupBox, 0, 20, 210, 490, 92)
+		wsChild|wsVisible|bsGroupBox, 0, 20, 396, 570, 92)
 	dlgAddControl(hwnd, hInstance, "STATIC",
 		trayText("当前：", "Current: ")+curLang,
-		wsChild|wsVisible|ssLeft, 0, 42, 236, 420, 24)
+		wsChild|wsVisible|ssLeft, 0, 42, 422, 500, 24)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "zh-CN")+"简体中文",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 120, 264, 132, 34)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangZh, 150, 450, 150, 34)
 	dlgAddControl(hwnd, hInstance, "BUTTON", mark(language == "en")+"English",
-		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 274, 264, 132, 34)
+		wsChild|wsVisible|wsTabStop|bsPushButton, idLangEn, 322, 450, 150, 34)
 	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("选择会立即保存。语言切换后，托盘菜单和应用界面会自动使用新语言。", "Changes are saved immediately. Menus and the app UI will use the selected language."),
-		wsChild|wsVisible|ssLeft, 0, 24, 322, 356, 36)
+		trayText("选择会立即保存。系统默认浏览器会按 Windows 默认应用打开。", "Changes are saved immediately. The system default browser follows Windows default apps."),
+		wsChild|wsVisible|ssLeft, 0, 24, 508, 430, 36)
 	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完成", "Done"),
-		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 390, 322, 100, 36)
+		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 488, 508, 100, 36)
 	runDlgModal(hwnd)
 	clicked := dlgClickedID
 	procDestroyWindow.Call(hwnd)
@@ -739,7 +797,16 @@ func showSettingsDialog() {
 	case idLangEn:
 		traySt.SetLanguage("en")
 		updateTrayTip()
+	case idBrowserDefault:
+		traySt.SetBrowserChoice(browserDefault)
 	case idSetClose:
 		return
+	default:
+		if clicked >= idBrowserFirst {
+			i := int(clicked - idBrowserFirst)
+			if i >= 0 && i < len(browsers) {
+				traySt.SetBrowserChoice(browsers[i].ID)
+			}
+		}
 	}
 }
