@@ -470,7 +470,7 @@ const (
 	settingsWinW = 560 // 设置窗：刚好容纳三项下拉框
 	settingsWinH = 470
 	closeWinW    = 480 // 关闭确认窗：两个按钮 + 说明 + 记住勾选
-	closeWinH    = 340
+	closeWinH    = 275
 )
 
 // showOrOpenSettingsWindow 显示独立设置窗口：已开则聚焦，否则新开并调整为居中小窗。
@@ -487,7 +487,7 @@ func showOrOpenClosePromptWindow(url string) {
 	if focusAppWindow(closePromptTitles) {
 		return
 	}
-	openBrowser(closePromptTitles, url, "--window-size=480,340")
+	openBrowser(closePromptTitles, url, "--window-size=480,275")
 	go centerWindowWhenReady(closePromptTitles, closeWinW, closeWinH)
 }
 
