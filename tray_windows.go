@@ -229,9 +229,13 @@ func trayAppName() string {
 	return trayText("多节点端口代理", "MultiPortProxy")
 }
 
+// windowTitleMatchesApp 判断窗口标题是否正是本应用界面窗口的标题。
+// 必须用"精确相等"而非"包含"：app 模式窗口标题就是网页 <title>（中文"多节点端口代理"/英文"MultiPortProxy"），
+// 而官网标题"MultiPortProxy · 多节点端口代理"同时包含这两者——用包含匹配会误把用户开着官网的普通浏览器窗口
+// 当成应用窗口，导致还原(缩小)该窗口并误判"应用已打开"。
 func windowTitleMatchesApp(title string) bool {
 	for _, appTitle := range appWindowTitles {
-		if strings.Contains(title, appTitle) {
+		if title == appTitle {
 			return true
 		}
 	}
@@ -412,8 +416,8 @@ func windowProcessBaseName(hwnd uintptr) string {
 	return strings.ToLower(filepath.Base(syscall.UTF16ToString(buf[:size])))
 }
 
-// enumWindowsProc 是 EnumWindows 的回调：按"标题包含应用名 + Chromium 顶层窗口类 + 目标浏览器进程"匹配本应用窗口。
-// app 模式窗口的实际标题在不同版本/语言环境下可能带后缀，不能用完全相等判断。
+// enumWindowsProc 是 EnumWindows 的回调：按"标题精确等于应用界面标题 + Chromium 顶层窗口类 + 目标浏览器进程"匹配本应用窗口。
+// 标题须精确相等以排除"开着官网的普通浏览器窗口"（见 windowTitleMatchesApp）。
 func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	visible, _, _ := procIsWindowVisible.Call(hwnd)
 	if visible == 0 {
