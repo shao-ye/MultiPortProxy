@@ -59,6 +59,7 @@ var (
 	procShowWindow       = user32.NewProc("ShowWindow")
 	procGetStockObject   = gdi32.NewProc("GetStockObject")
 	procCreateFontW      = gdi32.NewProc("CreateFontW")
+	procSetBkMode        = gdi32.NewProc("SetBkMode")
 )
 
 // ---------- 常量 ----------
@@ -68,9 +69,13 @@ const (
 	wmShowCloseTip = wmApp + 2 // 自定义消息：在托盘线程弹出"已最小化"气泡
 	wmAskClose     = wmApp + 3 // 自定义消息：在托盘线程弹出"关闭方式"询问对话框
 
-	wmClose         = 0x0010
-	wmCommand       = 0x0111
-	wmSetFont       = 0x0030
+	wmClose          = 0x0010
+	wmCommand        = 0x0111
+	wmSetFont        = 0x0030
+	wmCtlColorStatic = 0x0138 // STATIC 控件绘制前询问父窗口要画刷/文字色
+
+	transparentBkMode = 1 // SetBkMode：TRANSPARENT，文字背景不填充
+	whiteBrush        = 0  // GetStockObject：WHITE_BRUSH
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
 	wmRButtonUp     = 0x0205
@@ -93,20 +98,11 @@ const (
 	bsAutoCheckBox    = 0x00000003
 	bsGroupBox        = 0x00000007
 	ssLeft            = 0x00000000
-	wsVScroll         = 0x00200000
-	cbsDropDownList   = 0x00000003 // 下拉列表（只读，不可手输）
-
-	// 下拉框消息与通知码
-	cbAddString = 0x0143
-	cbSetCurSel = 0x014E
-	cbGetCurSel = 0x0147
-	cbnSelChange = 1
 
 	defaultGuiFont = 17
 
 	// Segoe UI 字体字重（CreateFontW 的 cWeight 参数）
-	fwNormal   = 400 // 正文常规
-	fwSemibold = 600 // 区块标题 / 主标题半粗
+	fwNormal = 400 // 正文常规
 	// CreateFontW 其它固定参数
 	defaultCharset   = 1 // DEFAULT_CHARSET：让系统按字符自动做 CJK 字体回退
 	clearTypeQuality = 5 // CLEARTYPE_QUALITY：开启抗锯齿，文字更顺滑
@@ -117,13 +113,9 @@ const (
 	swRestore      = 9
 
 	// 对话框控件 ID
-	idExitBtn       = 101 // 关闭询问：完全退出
-	idTrayBtn       = 102 // 关闭询问：最小化到托盘
-	idRemember      = 103 // 关闭询问：记住选择 勾选框
-	idSetClose      = 206 // 设置：关闭设置窗口（完成按钮）
-	idBrowserCombo  = 207 // 设置：界面浏览器下拉框
-	idCloseCombo    = 208 // 设置：关闭按钮行为下拉框
-	idLangCombo     = 209 // 设置：界面语言下拉框
+	idExitBtn  = 101 // 关闭询问：完全退出
+	idTrayBtn  = 102 // 关闭询问：最小化到托盘
+	idRemember = 103 // 关闭询问：记住选择 勾选框
 
 	// appWindowTitle 是浏览器 app 模式界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
 	// chromiumWindowClass 是 Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
@@ -151,7 +143,7 @@ const (
 	tpmRightButton = 0x0002
 
 	menuShow     = 1 // 托盘右键菜单：显示界面
-	menuSettings = 3 // 托盘右键菜单：设置（关闭按钮行为）
+	menuSettings = 3 // 托盘右键菜单：设置（打开网页界面的"界面偏好"区块）
 	menuExit     = 2 // 托盘右键菜单：完全退出
 )
 
@@ -352,9 +344,8 @@ func showTrayMenu(hwnd uintptr) {
 	case menuShow:
 		showOrOpenAppWindow(trayURL)
 	case menuSettings:
-		dialogShowing = true
-		showSettingsDialog()
-		dialogShowing = false
+		// 设置已迁移到网页界面：打开界面并定位到"界面偏好"区块
+		showOrOpenAppWindow(trayURL + "#prefs")
 	case menuExit:
 		trayExit()
 	}
@@ -592,24 +583,15 @@ var (
 // dlgProc 是自定义对话框的消息处理函数
 func dlgProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	switch msg {
+	case wmCtlColorStatic:
+		// 让 STATIC 文本背景透明并返回白色画刷，避免在白色窗口上出现灰色底条
+		procSetBkMode.Call(wparam, transparentBkMode)
+		br, _, _ := procGetStockObject.Call(whiteBrush)
+		return br
 	case wmCommand:
 		id := uint32(wparam) & 0xFFFF
 		if id == idRemember {
 			return 0 // 勾选框：自动切换状态即可，不结束对话框
-		}
-		// 设置对话框的三个下拉框：选中即保存，不结束对话框（lParam 为下拉框句柄）
-		if id == idBrowserCombo || id == idCloseCombo || id == idLangCombo {
-			if uint32(wparam)>>16 == cbnSelChange {
-				switch id {
-				case idBrowserCombo:
-					applyBrowserComboChoice(lparam)
-				case idCloseCombo:
-					applyCloseComboChoice(lparam)
-				case idLangCombo:
-					applyLangComboChoice(lparam)
-				}
-			}
-			return 0
 		}
 		// 仅置标志，窗口销毁推迟到调用方读取完勾选框状态后再做，
 		// 否则 DestroyWindow 会连带销毁勾选框，导致读不到"记住"状态
@@ -663,10 +645,8 @@ func createDlg(hInstance uintptr, title string, w, h int) uintptr {
 // Segoe UI（中文由系统字体回退渲染），并按字号/字重缓存复用。
 
 var (
-	uiFontOnce  sync.Once
-	uiFont      uintptr // 正文：Segoe UI 9pt 常规
-	uiFontBold  uintptr // 区块标题：Segoe UI 9pt 半粗
-	uiFontTitle uintptr // 对话框主标题：Segoe UI 13pt 半粗
+	uiFontOnce sync.Once
+	uiFont     uintptr // 正文：Segoe UI 9pt 常规
 )
 
 // makeUIFont 创建一个指定字号(pt)与字重的 Segoe UI 字体。
@@ -688,14 +668,7 @@ func makeUIFont(pt, weight int) uintptr {
 func ensureUIFonts() {
 	uiFontOnce.Do(func() {
 		uiFont = makeUIFont(9, fwNormal)
-		uiFontBold = makeUIFont(9, fwSemibold)
-		uiFontTitle = makeUIFont(13, fwSemibold)
 	})
-}
-
-// setControlFont 给已创建的控件指定字体（用于区块标题 / 主标题加粗显示）
-func setControlFont(ctl syscall.Handle, font uintptr) {
-	procSendMessageW.Call(uintptr(ctl), wmSetFont, font, 1)
 }
 
 // dlgAddControl 在对话框上创建一个子控件（STATIC 文本 / BUTTON 按钮或勾选框），并应用现代界面字体
@@ -769,169 +742,5 @@ func showCloseDialog() (string, bool) {
 	}
 }
 
-// settingsBrowserChoices 把"界面浏览器"下拉框的每个表项索引映射到对应的 BrowserChoice 值。
-// 索引 0 固定是"跟随系统默认"，其后依次是各个支持应用窗口的浏览器。
-var settingsBrowserChoices []string
-
-// settingsCloseChoices / settingsLangChoices 分别把"关闭按钮行为""界面语言"下拉框的表项索引
-// 映射到对应的持久化取值，顺序需与下拉框 comboAddString 的添加顺序一致。
-var (
-	settingsCloseChoices = []string{"ask", "exit", "tray"}
-	settingsLangChoices  = []string{"zh-CN", "en"}
-)
-
-// comboAddString 向下拉框追加一个表项
-func comboAddString(combo syscall.Handle, text string) {
-	procSendMessageW.Call(uintptr(combo), cbAddString, 0, uintptr(unsafe.Pointer(utf16Ptr(text))))
-}
-
-// applyBrowserComboChoice 在下拉框选择变化时读取当前选项并立即保存
-func applyBrowserComboChoice(comboHwnd uintptr) {
-	if traySt == nil {
-		return
-	}
-	idx, _, _ := procSendMessageW.Call(comboHwnd, cbGetCurSel, 0, 0)
-	i := int(idx)
-	if i >= 0 && i < len(settingsBrowserChoices) {
-		traySt.SetBrowserChoice(settingsBrowserChoices[i])
-	}
-}
-
-// applyCloseComboChoice 在"关闭按钮行为"下拉框选择变化时读取当前选项并立即保存
-func applyCloseComboChoice(comboHwnd uintptr) {
-	if traySt == nil {
-		return
-	}
-	idx, _, _ := procSendMessageW.Call(comboHwnd, cbGetCurSel, 0, 0)
-	i := int(idx)
-	if i >= 0 && i < len(settingsCloseChoices) {
-		traySt.SetCloseAction(settingsCloseChoices[i])
-	}
-}
-
-// applyLangComboChoice 在"界面语言"下拉框选择变化时读取当前选项，立即保存并刷新托盘提示
-func applyLangComboChoice(comboHwnd uintptr) {
-	if traySt == nil {
-		return
-	}
-	idx, _, _ := procSendMessageW.Call(comboHwnd, cbGetCurSel, 0, 0)
-	i := int(idx)
-	if i >= 0 && i < len(settingsLangChoices) {
-		traySt.SetLanguage(settingsLangChoices[i])
-		updateTrayTip()
-	}
-}
-
-// showSettingsDialog 弹出"设置"对话框，用统一的下拉框风格调整关闭按钮(X)行为、界面浏览器与界面语言。
-// 三项均在下拉框选择变化时即时保存，"完成"按钮仅关闭窗口。
-func showSettingsDialog() {
-	dlgDone = false
-	dlgClickedID = 0
-	dlgCheckHwnd = 0
-	hInstance, _, _ := procGetModuleHandleW.Call(0)
-	closeAction := traySt.GetCloseAction()
-	language := trayLanguage()
-	browserChoice := traySt.GetBrowserChoice()
-	installedBrowsers := detectInstalledBrowsers()
-	browsers := appModeBrowsers(installedBrowsers)
-	systemBrowser, systemBrowserOK := systemDefaultAppModeBrowser(installedBrowsers)
-
-	// ---- 各下拉框当前选中索引 ----
-	// 浏览器：0=跟随系统默认，其后依次是各浏览器；保存的浏览器若已不可用则回退到"跟随系统默认"。
-	browserSel := 0
-	normChoice := normalizeBrowserChoice(browserChoice)
-	if normChoice != browserSystem {
-		for i, browser := range browsers {
-			if browser.ID == normChoice {
-				browserSel = i + 1
-				break
-			}
-		}
-	}
-	closeSel := indexOf(settingsCloseChoices, closeAction)
-	langSel := indexOf(settingsLangChoices, language)
-	systemLabel := trayText("跟随系统默认", "Use system default")
-	if systemBrowserOK {
-		systemLabel = trayText("跟随系统默认（", "System default (") + systemBrowser.Name + trayText("）", ")")
-	}
-
-	// ---- 布局常量（统一左边距、内容宽度，三段式垂直排布） ----
-	const (
-		marginX    = 24  // 内容左边距
-		contentW   = 452 // 标题 / 下拉框宽度
-		comboH     = 220 // 下拉框总高（含展开列表区）
-		headerH    = 20  // 区块标题高度
-		comboGap   = 24  // 区块标题到下拉框的间距
-		sectionGap = 48  // 相邻区块的垂直步进
-	)
-
-	hwnd := createDlg(hInstance, trayText("设置 - MultiPortProxy", "Settings - MultiPortProxy"), 500, 440)
-
-	// addHeader 在指定 y 处放一个半粗体的区块标题
-	addHeader := func(text string, y int) {
-		h := dlgAddControl(hwnd, hInstance, "STATIC", text,
-			wsChild|wsVisible|ssLeft, 0, marginX, y, contentW, headerH)
-		setControlFont(h, uiFontBold)
-	}
-
-	// 主标题 + 副标题
-	title := dlgAddControl(hwnd, hInstance, "STATIC", trayText("设置", "Settings"),
-		wsChild|wsVisible|ssLeft, 0, marginX, 16, contentW, 28)
-	setControlFont(title, uiFontTitle)
-	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("调整窗口关闭行为、界面浏览器和界面语言，更改即时生效。", "Adjust close behavior, browser and language. Changes apply instantly."),
-		wsChild|wsVisible|ssLeft, 0, marginX, 50, contentW, 20)
-
-	// 区块 1：关闭窗口时
-	y := 88
-	addHeader(trayText("关闭窗口时", "When the window is closed"), y)
-	closeCombo := dlgAddControl(hwnd, hInstance, "COMBOBOX", "",
-		wsChild|wsVisible|wsTabStop|wsVScroll|cbsDropDownList, idCloseCombo, marginX, y+comboGap, contentW, comboH)
-	comboAddString(closeCombo, trayText("每次询问（关闭时弹窗选择）", "Ask each time"))
-	comboAddString(closeCombo, trayText("直接退出程序", "Exit the app"))
-	comboAddString(closeCombo, trayText("最小化到托盘", "Minimize to tray"))
-	procSendMessageW.Call(uintptr(closeCombo), cbSetCurSel, uintptr(closeSel), 0)
-
-	// 区块 2：界面浏览器
-	y += sectionGap + comboGap
-	addHeader(trayText("界面浏览器", "Interface browser"), y)
-	browserCombo := dlgAddControl(hwnd, hInstance, "COMBOBOX", "",
-		wsChild|wsVisible|wsTabStop|wsVScroll|cbsDropDownList, idBrowserCombo, marginX, y+comboGap, contentW, comboH)
-	settingsBrowserChoices = []string{browserSystem}
-	comboAddString(browserCombo, systemLabel)
-	for _, browser := range browsers {
-		settingsBrowserChoices = append(settingsBrowserChoices, browser.ID)
-		comboAddString(browserCombo, browser.Name)
-	}
-	procSendMessageW.Call(uintptr(browserCombo), cbSetCurSel, uintptr(browserSel), 0)
-
-	// 区块 3：界面语言
-	y += sectionGap + comboGap
-	addHeader(trayText("界面语言", "Interface language"), y)
-	langCombo := dlgAddControl(hwnd, hInstance, "COMBOBOX", "",
-		wsChild|wsVisible|wsTabStop|wsVScroll|cbsDropDownList, idLangCombo, marginX, y+comboGap, contentW, 160)
-	comboAddString(langCombo, "简体中文")
-	comboAddString(langCombo, "English")
-	procSendMessageW.Call(uintptr(langCombo), cbSetCurSel, uintptr(langSel), 0)
-
-	// 底部说明 + 完成按钮
-	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText("浏览器下拉框只列出支持独立应用窗口的浏览器。", "The browser list only shows apps that support standalone windows."),
-		wsChild|wsVisible|ssLeft, 0, marginX, 356, 320, 36)
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完成", "Done"),
-		wsChild|wsVisible|wsTabStop|bsDefPushButton, idSetClose, 376, 354, 100, 34)
-
-	runDlgModal(hwnd)
-	procDestroyWindow.Call(hwnd)
-	// 关闭行为 / 界面浏览器 / 界面语言均在各自下拉框 CBN_SELCHANGE 时即时保存，关闭对话框无需再处理。
-}
-
-// indexOf 返回 v 在 list 中的下标，不存在则返回 0（用于把当前设置映射到下拉框选中项）
-func indexOf(list []string, v string) int {
-	for i, s := range list {
-		if s == v {
-			return i
-		}
-	}
-	return 0
-}
+// 注：旧的原生"设置"对话框（关闭行为/界面浏览器/界面语言三项下拉框）已迁移到网页界面，
+// 由 /api/preferences 读写。托盘"设置"菜单改为打开界面并定位到"界面偏好"区块（见 showTrayMenu）。

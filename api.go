@@ -38,11 +38,17 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 	// 获取完整状态：设置、节点列表、运行状态
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		st.mu.Lock()
+		closeAction := st.CloseAction
+		if closeAction == "" {
+			closeAction = "ask"
+		}
 		resp := map[string]any{
-			"settings": st.Settings,
-			"nodes":    st.Nodes,
-			"running":  core.IsRunning(),
-			"language": normalizeLanguage(st.Language),
+			"settings":      st.Settings,
+			"nodes":         st.Nodes,
+			"running":       core.IsRunning(),
+			"language":      normalizeLanguage(st.Language),
+			"closeAction":   closeAction,
+			"browserChoice": normalizeBrowserChoice(st.BrowserChoice),
 		}
 		buf, _ := json.Marshal(resp)
 		st.mu.Unlock()
@@ -60,6 +66,51 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 		}
 		st.SetLanguage(req.Language)
 		jsonResp(w, map[string]string{"language": st.GetLanguage()})
+	})
+
+	// 界面偏好：关闭按钮(X)行为 / 界面浏览器 / 界面语言。
+	// GET 返回当前取值与可选浏览器列表（供网页下拉框渲染）；POST 即时保存提交的字段。
+	mux.HandleFunc("/api/preferences", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			// 用指针区分"未提交"与"提交了空串"，只更新明确提交的字段
+			var req struct {
+				CloseAction   *string `json:"closeAction"`
+				BrowserChoice *string `json:"browserChoice"`
+				Language      *string `json:"language"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				jsonErr(w, "请求格式错误")
+				return
+			}
+			if req.CloseAction != nil {
+				st.SetCloseAction(*req.CloseAction)
+			}
+			if req.BrowserChoice != nil {
+				st.SetBrowserChoice(*req.BrowserChoice)
+			}
+			if req.Language != nil {
+				st.SetLanguage(*req.Language)
+			}
+			jsonResp(w, map[string]bool{"ok": true})
+			return
+		}
+		// GET：组装可选浏览器列表（仅支持独立应用窗口的浏览器）与系统默认浏览器名
+		installed := detectInstalledBrowsers()
+		browsers := []map[string]string{}
+		for _, b := range appModeBrowsers(installed) {
+			browsers = append(browsers, map[string]string{"id": b.ID, "name": b.Name})
+		}
+		systemName := ""
+		if sys, ok := systemDefaultAppModeBrowser(installed); ok {
+			systemName = sys.Name
+		}
+		jsonResp(w, map[string]any{
+			"closeAction":       st.GetCloseAction(),
+			"browserChoice":     st.GetBrowserChoice(),
+			"language":          st.GetLanguage(),
+			"browsers":          browsers,
+			"systemBrowserName": systemName,
+		})
 	})
 
 	// 批量导入分享链接，逐行解析，返回成功/失败统计
