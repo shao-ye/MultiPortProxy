@@ -1,13 +1,13 @@
 name: Release
 
-# 打 tag（形如 v1.0.0）时自动交叉编译 Windows 可执行程序并发布 Release
+# 推送 v* tag 时自动交叉编译 Windows 可执行文件并发布 Release。
 on:
   push:
     tags:
       - 'v*'
 
 permissions:
-  contents: write   # 创建 Release 需要写权限
+  contents: write
 
 jobs:
   build:
@@ -21,20 +21,45 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: 同步版本信息
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          version = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          parts = [int(p) for p in version.split(".")]
+          while len(parts) < 4:
+              parts.append(0)
+          major, minor, patch, build = parts[:4]
+
+          with open("versioninfo.json", "r", encoding="utf-8") as f:
+              info = json.load(f)
+
+          file_version = {"Major": major, "Minor": minor, "Patch": patch, "Build": build}
+          info["FixedFileInfo"]["FileVersion"] = file_version
+          info["FixedFileInfo"]["ProductVersion"] = file_version
+          info["StringFileInfo"]["FileVersion"] = f"{major}.{minor}.{patch}.{build}"
+          info["StringFileInfo"]["ProductVersion"] = f"{major}.{minor}.{patch}.{build}"
+
+          with open("versioninfo.release.json", "w", encoding="utf-8") as f:
+              json.dump(info, f, ensure_ascii=False, indent=2)
+              f.write("\n")
+          PY
+
       - name: 生成版本信息与图标资源
-        # 把产品名/版本/版权/图标写入 exe，提升正规度、降低杀软启发式误报
         run: |
           go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
-          "$(go env GOPATH)/bin/goversioninfo" -64 -o resource_windows_amd64.syso -icon app.ico versioninfo.json
+          "$(go env GOPATH)/bin/goversioninfo" -64 -o resource_windows_amd64.syso -icon app.ico versioninfo.release.json
 
       - name: 交叉编译 Windows exe
         env:
           GOOS: windows
           GOARCH: amd64
           CGO_ENABLED: '0'
-        # -H windowsgui：运行时不弹控制台黑窗口；-s -w：去符号表减小体积
-        # 同目录的 resource_windows_amd64.syso 会被 go build 自动嵌入
-        run: go build -ldflags "-H windowsgui -s -w" -o MultiPortProxy.exe .
+        # -H windowsgui：运行时不弹控制台窗口。保留符号表，降低启发式误报概率并方便安全分析。
+        # 同目录的 resource_windows_amd64.syso 会被 go build 自动嵌入。
+        run: go build -ldflags "-H windowsgui" -o MultiPortProxy.exe .
 
       - name: 打包发布物
         run: |
@@ -45,11 +70,15 @@ jobs:
           cp LICENSE dist/
           cd dist && zip -r "../MultiPortProxy-${GITHUB_REF_NAME}-windows-amd64.zip" .
 
+      - name: 生成 SHA256 校验文件
+        run: |
+          sha256sum MultiPortProxy.exe "MultiPortProxy-${GITHUB_REF_NAME}-windows-amd64.zip" > SHA256SUMS.txt
+
       - name: 创建 Release 并上传产物
         uses: softprops/action-gh-release@v2
         with:
-          # 同时提供裸 exe 和打包 zip，方便不同需求下载
           files: |
             MultiPortProxy.exe
             MultiPortProxy-*-windows-amd64.zip
-          generate_release_notes: true   # 自动根据提交生成发布说明
+            SHA256SUMS.txt
+          generate_release_notes: true

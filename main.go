@@ -32,7 +32,6 @@ var (
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口
 func main() {
 	setProcessAppUserModelID()
-	ensureStartMenuShortcut()
 
 	st := LoadState()
 	browserState = st
