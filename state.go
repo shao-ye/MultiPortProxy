@@ -83,6 +83,14 @@ func (st *AppState) SetCloseAction(action string) {
 	st.mu.Unlock()
 }
 
+// SetAutoStart 设置"下次启动自动恢复服务"标记并立即持久化
+func (st *AppState) SetAutoStart(on bool) {
+	st.mu.Lock()
+	st.AutoStart = on
+	_ = st.saveLocked()
+	st.mu.Unlock()
+}
+
 func normalizeLanguage(language string) string {
 	if language == "en" {
 		return "en"
