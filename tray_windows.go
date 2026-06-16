@@ -516,10 +516,10 @@ func showOrOpenAppWindow(url string) {
 	openBrowser(mainWindowTitles, url)
 }
 
-// 设置窗口的目标尺寸（逻辑像素，96 DPI 基准）
+// 设置窗口的目标尺寸（逻辑像素，96 DPI 基准）：刚好容纳三项下拉框，避免大片留白
 const (
-	settingsWinW = 640
-	settingsWinH = 600
+	settingsWinW = 560
+	settingsWinH = 470
 )
 
 // showOrOpenSettingsWindow 显示独立设置窗口：已开则聚焦，否则新开并调整为居中小窗。
@@ -529,7 +529,7 @@ func showOrOpenSettingsWindow(url string) {
 	}
 	// --window-size 仅在浏览器新起进程时生效；多数情况下设置窗与主界面同进程，会被忽略，
 	// 故新开后再用 SetWindowPos 兜底把窗口调成居中小窗（见 centerSettingsWindowWhenReady）。
-	openBrowser(settingsWindowTitles, url, "--window-size=640,600")
+	openBrowser(settingsWindowTitles, url, "--window-size=560,470")
 	go centerSettingsWindowWhenReady()
 }
 
