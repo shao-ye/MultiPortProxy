@@ -53,18 +53,6 @@
   textarea { width: 100%; height: 88px; resize: vertical; font-family: Consolas, monospace; font-size: 12px; }
   label { font-size: 13px; color: #aab0bd; display: flex; align-items: center; gap: 6px; }
 
-  /* ---------- 下拉框（界面偏好） ---------- */
-  select {
-    background: #14161b; color: #d8dbe2; border: 1px solid #3a3f4d;
-    border-radius: 6px; padding: 7px 10px; font-size: 13px; cursor: pointer;
-    min-width: 240px;
-  }
-  select:hover { border-color: #4a5061; }
-  select:focus { outline: none; border-color: #2563eb; }
-  .pref-grid { display: flex; gap: 28px; flex-wrap: wrap; }
-  .pref-item { display: flex; flex-direction: column; gap: 7px; }
-  .pref-item > label { color: #7c8190; font-size: 12px; }
-
   /* ---------- 节点表格 ---------- */
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #2b2f3a; }
@@ -168,26 +156,6 @@
   <div class="muted" style="margin-top:6px">点"自动探测内核"会通过运行中的 v2rayN 进程自动定位 mihomo.exe / xray.exe（请先开着 v2rayN）；也可手动粘贴路径。勾选"允许局域网"后其它电脑可通过本机 IP 使用这些代理端口</div>
 </div>
 
-<!-- 界面偏好面板（关闭行为 / 界面浏览器 / 界面语言，更改即时生效） -->
-<div class="card" id="prefsCard">
-  <h2 id="prefsTitle">界面偏好</h2>
-  <div class="pref-grid">
-    <div class="pref-item">
-      <label id="prefCloseLabel" for="prefClose">关闭窗口时</label>
-      <select id="prefClose" onchange="savePref('closeAction', this.value)"></select>
-    </div>
-    <div class="pref-item">
-      <label id="prefBrowserLabel" for="prefBrowser">界面浏览器</label>
-      <select id="prefBrowser" onchange="savePref('browserChoice', this.value)"></select>
-    </div>
-    <div class="pref-item">
-      <label id="prefLangLabel" for="prefLang">界面语言</label>
-      <select id="prefLang" onchange="savePref('language', this.value)"></select>
-    </div>
-  </div>
-  <div class="muted" id="prefsHint" style="margin-top:10px">更改即时生效。浏览器下拉框只列出支持独立应用窗口的浏览器。</div>
-</div>
-
 <!-- 日志面板 -->
 <div class="card">
   <h2>内核日志</h2>
@@ -228,8 +196,6 @@ function esc(s) {
 
 let state = { nodes: [], running: false, settings: {}, language: 'zh-CN' };
 let settingsLoaded = false; // 设置输入框只在首次加载时填充，避免覆盖用户正在输入的内容
-let prefsData = null;       // 界面偏好的浏览器列表等（仅拉取一次）
-let prefsBuilt = false;     // 三个偏好下拉框是否已构建选项
 
 const I18N = {
   'zh-CN': {
@@ -262,16 +228,6 @@ const I18N = {
     detectCores: '🔍 自动探测内核',
     xhttpOnly: '仅 xhttp 节点需要',
     settingsHint: '点“自动探测内核”会通过运行中的 v2rayN 进程自动定位 mihomo.exe / xray.exe（请先开着 v2rayN）；也可手动粘贴路径。勾选“允许局域网”后其它电脑可通过本机 IP 使用这些代理端口',
-    prefsTitle: '界面偏好',
-    prefClose: '关闭窗口时',
-    prefBrowser: '界面浏览器',
-    prefLang: '界面语言',
-    prefsHint: '更改即时生效。浏览器下拉框只列出支持独立应用窗口的浏览器。',
-    closeAsk: '每次询问（关闭时弹窗选择）',
-    closeExit: '直接退出程序',
-    closeTray: '最小化到托盘',
-    browserSystem: '跟随系统默认',
-    browserSystemNamed: '跟随系统默认（%s）',
     logs: '内核日志',
     failed: '失败',
     parseFailed: '解析失败',
@@ -332,16 +288,6 @@ const I18N = {
     detectCores: '🔍 Auto-detect cores',
     xhttpOnly: 'Only needed for xhttp nodes',
     settingsHint: 'Auto-detect locates mihomo.exe / xray.exe from a running v2rayN process. You can also paste paths manually. When LAN is enabled, other computers can use these proxy ports through this machine IP.',
-    prefsTitle: 'Interface preferences',
-    prefClose: 'When window closes',
-    prefBrowser: 'Interface browser',
-    prefLang: 'Interface language',
-    prefsHint: 'Changes apply instantly. The browser list only shows apps that support standalone windows.',
-    closeAsk: 'Ask each time',
-    closeExit: 'Exit the app',
-    closeTray: 'Minimize to tray',
-    browserSystem: 'Use system default',
-    browserSystemNamed: 'System default (%s)',
     logs: 'Core logs',
     failed: 'Failed',
     parseFailed: 'Parse failed',
@@ -420,13 +366,7 @@ function applyI18n() {
   cards[2].querySelector('button.primary').textContent = t('detectCores');
   cards[2].querySelectorAll('.muted')[0].textContent = t('xhttpOnly');
   cards[2].querySelectorAll('.muted')[1].textContent = t('settingsHint');
-  // 界面偏好卡片（cards[3]）：标题/标签/说明按 id 定位，下拉框选项由 renderPrefs 单独构建
-  document.getElementById('prefsTitle').textContent = t('prefsTitle');
-  document.getElementById('prefCloseLabel').textContent = t('prefClose');
-  document.getElementById('prefBrowserLabel').textContent = t('prefBrowser');
-  document.getElementById('prefLangLabel').textContent = t('prefLang');
-  document.getElementById('prefsHint').textContent = t('prefsHint');
-  cards[4].querySelector('h2').textContent = t('logs');
+  cards[3].querySelector('h2').textContent = t('logs');
 }
 
 // 从后端拉取最新状态并刷新整个界面
@@ -438,8 +378,6 @@ async function refresh() {
   applyI18n();
   renderTopbar();
   renderNodes();
-  syncPrefValues(); // 同步界面偏好下拉框的选中项（关闭行为可能在托盘"记住选择"时被改动）
-  if (state.focusPrefs) scrollToPrefs(); // 托盘点"设置"后定位到界面偏好
   if (!settingsLoaded) {
     document.getElementById('setCorePath').value = state.settings.corePath || '';
     document.getElementById('setXrayPath').value = state.settings.xrayPath || '';
@@ -596,68 +534,6 @@ async function saveSettings() {
   } catch (e) { toast(e.message, true); }
 }
 
-/* ================= 界面偏好 ================= */
-
-// 拉取界面偏好（含可选浏览器列表），仅在页面加载时调用一次
-async function loadPrefs() {
-  try {
-    prefsData = await (await fetch('/api/preferences')).json();
-  } catch (e) { return; }
-  // 用偏好接口返回的当前值兜底，避免首帧 state 尚未就绪
-  state.language = prefsData.language || state.language;
-  state.closeAction = state.closeAction || prefsData.closeAction;
-  state.browserChoice = state.browserChoice || prefsData.browserChoice;
-  renderPrefs();
-  prefsBuilt = true;
-  applyI18n();
-}
-
-// 构建三个偏好下拉框的选项。语言切换会改变本地化文案，故需要可重建；
-// 构建后按当前状态选中对应项。
-function renderPrefs() {
-  if (!prefsData) return;
-  document.getElementById('prefClose').innerHTML =
-    `<option value="ask">${t('closeAsk')}</option>` +
-    `<option value="exit">${t('closeExit')}</option>` +
-    `<option value="tray">${t('closeTray')}</option>`;
-  let sysLabel = prefsData.systemBrowserName
-    ? t('browserSystemNamed').replace('%s', prefsData.systemBrowserName)
-    : t('browserSystem');
-  let browserOpts = `<option value="system">${esc(sysLabel)}</option>`;
-  (prefsData.browsers || []).forEach(b => {
-    browserOpts += `<option value="${esc(b.id)}">${esc(b.name)}</option>`;
-  });
-  document.getElementById('prefBrowser').innerHTML = browserOpts;
-  document.getElementById('prefLang').innerHTML =
-    `<option value="zh-CN">简体中文</option><option value="en">English</option>`;
-  syncPrefValues();
-}
-
-// 用最新状态设置三个下拉框的选中项（轮询时调用，保持与后台一致；选项不重建，避免打断用户操作）
-function syncPrefValues() {
-  if (!prefsBuilt) return;
-  document.getElementById('prefClose').value = state.closeAction || 'ask';
-  document.getElementById('prefBrowser').value = state.browserChoice || 'system';
-  document.getElementById('prefLang').value = lang();
-}
-
-// 保存单项偏好（下拉框 onchange 触发），即时生效
-async function savePref(field, value) {
-  try {
-    await post('/api/preferences', { [field]: value });
-    if (field === 'language') {
-      state.language = value;
-      applyI18n();
-      renderPrefs(); // 重建本地化的下拉选项文案
-    } else if (field === 'closeAction') {
-      state.closeAction = value;
-    } else if (field === 'browserChoice') {
-      state.browserChoice = value;
-    }
-    toast(t('settingsSaved'));
-  } catch (e) { toast(e.message, true); }
-}
-
 // 自动探测内核路径并填入输入框（不自动保存，由用户确认后点"保存设置"）
 async function detectCores() {
   try {
@@ -685,24 +561,11 @@ async function refreshLogs() {
   } catch (e) {}
 }
 
-// 平滑滚动并定位到"界面偏好"卡片（托盘点"设置"或带 #prefs 锚点打开时调用）
-function scrollToPrefs() {
-  const card = document.getElementById('prefsCard');
-  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 /* ================= 定时轮询 ================= */
 refresh();
-loadPrefs();
 refreshLogs();
 setInterval(refresh, 3000);
 setInterval(refreshLogs, 2000);
-
-// 界面窗口被托盘重新聚焦时立即拉一次状态，使"设置"定位无需等待轮询间隔
-window.addEventListener('focus', refresh);
-
-// 带 #prefs 锚点打开时也直接定位一次（新开窗口的兜底）
-if (location.hash === '#prefs') setTimeout(scrollToPrefs, 300);
 
 /* ================= 窗口关闭信标 =================
    界面是 Edge --app 窗口，点右上角 X 只会关掉窗口，后台 Go 进程仍在运行。

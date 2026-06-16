@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 独立设置窗口：标题须与 tray_windows.go 的 settingsWindowTitles 精确一致，供托盘定位/聚焦/关闭 -->
+<link rel="icon" type="image/png" href="favicon.png">
+<title>设置 - 多节点端口代理</title>
+<style>
+  /* ---------- 深色主题（与主界面一致） ---------- */
+  html { color-scheme: dark; } /* 让原生下拉框列表、滚动条跟随深色 */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #16181d; color: #d8dbe2; font-size: 14px;
+    padding: 24px 28px;
+  }
+  h1 { font-size: 20px; font-weight: 600; }
+  .muted { color: #7c8190; font-size: 12px; }
+  .sub { color: #7c8190; font-size: 13px; margin-top: 6px; }
+
+  .card {
+    background: #1d2026; border: 1px solid #2b2f3a; border-radius: 10px;
+    padding: 20px 22px; margin-top: 18px;
+  }
+  .pref-item { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .pref-item:last-of-type { margin-bottom: 0; }
+  .pref-item > label { color: #aab0bd; font-size: 13px; font-weight: 600; }
+
+  select {
+    background: #14161b; color: #d8dbe2; border: 1px solid #3a3f4d;
+    border-radius: 6px; padding: 8px 10px; font-size: 13px; cursor: pointer;
+    width: 100%;
+  }
+  select:hover { border-color: #4a5061; }
+  select:focus { outline: none; border-color: #2563eb; }
+
+  #hint { margin-top: 20px; border-top: 1px solid #2b2f3a; padding-top: 14px; }
+
+  #toast {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    background: #1d4ed8; color: #fff; padding: 8px 22px; border-radius: 8px;
+    font-size: 13px; display: none; z-index: 99; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  #toast.error { background: #b91c1c; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<h1 id="pageTitle">设置</h1>
+<div class="sub" id="pageSub">调整窗口关闭行为、界面浏览器和界面语言，更改即时生效。</div>
+
+<div class="card">
+  <div class="pref-item">
+    <label id="lblClose" for="prefClose">关闭窗口时</label>
+    <select id="prefClose" onchange="savePref('closeAction', this.value)"></select>
+  </div>
+  <div class="pref-item">
+    <label id="lblBrowser" for="prefBrowser">界面浏览器</label>
+    <select id="prefBrowser" onchange="savePref('browserChoice', this.value)"></select>
+  </div>
+  <div class="pref-item">
+    <label id="lblLang" for="prefLang">界面语言</label>
+    <select id="prefLang" onchange="savePref('language', this.value)"></select>
+  </div>
+  <div class="muted" id="hint">更改即时生效。浏览器下拉框只列出支持独立应用窗口的浏览器。</div>
+</div>
+
+<script>
+/* ================= 独立设置页逻辑 ================= */
+
+// 文案表（中/英）。docTitle 须与后端 settingsWindowTitles 精确一致。
+const T = {
+  'zh-CN': {
+    docTitle: '设置 - 多节点端口代理',
+    pageTitle: '设置',
+    pageSub: '调整窗口关闭行为、界面浏览器和界面语言，更改即时生效。',
+    lblClose: '关闭窗口时',
+    lblBrowser: '界面浏览器',
+    lblLang: '界面语言',
+    hint: '更改即时生效。浏览器下拉框只列出支持独立应用窗口的浏览器。',
+    closeAsk: '每次询问（关闭时弹窗选择）',
+    closeExit: '直接退出程序',
+    closeTray: '最小化到托盘',
+    browserSystem: '跟随系统默认',
+    browserSystemNamed: '跟随系统默认（%s）',
+    saved: '设置已保存',
+    failed: '请求失败',
+  },
+  en: {
+    docTitle: 'Settings - MultiPortProxy',
+    pageTitle: 'Settings',
+    pageSub: 'Adjust close behavior, browser and language. Changes apply instantly.',
+    lblClose: 'When window closes',
+    lblBrowser: 'Interface browser',
+    lblLang: 'Interface language',
+    hint: 'Changes apply instantly. The browser list only shows apps that support standalone windows.',
+    closeAsk: 'Ask each time',
+    closeExit: 'Exit the app',
+    closeTray: 'Minimize to tray',
+    browserSystem: 'Use system default',
+    browserSystemNamed: 'System default (%s)',
+    saved: 'Saved',
+    failed: 'Request failed',
+  },
+};
+
+let langCur = 'zh-CN'; // 当前界面语言
+let prefs = null;      // /api/preferences 返回的偏好与浏览器列表
+
+function t(k) { return (T[langCur] && T[langCur][k]) || T['zh-CN'][k] || k; }
+
+// HTML 转义，防止浏览器名等内容破坏页面
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 顶部提示条
+function toast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = isError ? 'error' : '';
+  el.style.display = 'block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.style.display = 'none', 2500);
+}
+
+// 拉取偏好并渲染
+async function load() {
+  try { prefs = await (await fetch('/api/preferences')).json(); }
+  catch (e) { return; }
+  langCur = prefs.language === 'en' ? 'en' : 'zh-CN';
+  render();
+}
+
+// 渲染整页（语言切换后重建本地化文案与下拉选项，并按当前值选中）
+function render() {
+  if (!prefs) return;
+  document.documentElement.lang = langCur;
+  document.title = t('docTitle');
+  document.getElementById('pageTitle').textContent = t('pageTitle');
+  document.getElementById('pageSub').textContent = t('pageSub');
+  document.getElementById('lblClose').textContent = t('lblClose');
+  document.getElementById('lblBrowser').textContent = t('lblBrowser');
+  document.getElementById('lblLang').textContent = t('lblLang');
+  document.getElementById('hint').textContent = t('hint');
+
+  document.getElementById('prefClose').innerHTML =
+    `<option value="ask">${t('closeAsk')}</option>` +
+    `<option value="exit">${t('closeExit')}</option>` +
+    `<option value="tray">${t('closeTray')}</option>`;
+
+  const sysLabel = prefs.systemBrowserName
+    ? t('browserSystemNamed').replace('%s', prefs.systemBrowserName)
+    : t('browserSystem');
+  let browserOpts = `<option value="system">${esc(sysLabel)}</option>`;
+  (prefs.browsers || []).forEach(b => {
+    browserOpts += `<option value="${esc(b.id)}">${esc(b.name)}</option>`;
+  });
+  document.getElementById('prefBrowser').innerHTML = browserOpts;
+
+  document.getElementById('prefLang').innerHTML =
+    `<option value="zh-CN">简体中文</option><option value="en">English</option>`;
+
+  document.getElementById('prefClose').value = prefs.closeAction || 'ask';
+  document.getElementById('prefBrowser').value = prefs.browserChoice || 'system';
+  document.getElementById('prefLang').value = langCur;
+}
+
+// 保存单项偏好，即时生效；切换语言时整页重渲染
+async function savePref(field, value) {
+  try {
+    const resp = await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    });
+    if (!resp.ok) throw new Error(t('failed'));
+    if (field === 'closeAction') prefs.closeAction = value;
+    else if (field === 'browserChoice') prefs.browserChoice = value;
+    else if (field === 'language') { prefs.language = value; langCur = value === 'en' ? 'en' : 'zh-CN'; render(); }
+    toast(t('saved'));
+  } catch (e) { toast(e.message, true); }
+}
+
+load();
+</script>
+</body>
+</html>

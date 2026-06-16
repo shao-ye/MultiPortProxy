@@ -38,19 +38,11 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 	// 获取完整状态：设置、节点列表、运行状态
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		st.mu.Lock()
-		closeAction := st.CloseAction
-		if closeAction == "" {
-			closeAction = "ask"
-		}
 		resp := map[string]any{
-			"settings":      st.Settings,
-			"nodes":         st.Nodes,
-			"running":       core.IsRunning(),
-			"language":      normalizeLanguage(st.Language),
-			"closeAction":   closeAction,
-			"browserChoice": normalizeBrowserChoice(st.BrowserChoice),
-			// 一次性标记：托盘点"设置"后为 true，网页据此滚动到"界面偏好"，读后即清除
-			"focusPrefs": focusPrefsPending.Swap(false),
+			"settings": st.Settings,
+			"nodes":    st.Nodes,
+			"running":  core.IsRunning(),
+			"language": normalizeLanguage(st.Language),
 		}
 		buf, _ := json.Marshal(resp)
 		st.mu.Unlock()

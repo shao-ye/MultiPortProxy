@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -22,13 +21,12 @@ var webFS embed.FS
 const uiPort = 23456
 
 var (
-	browserOpenMu       sync.Mutex
-	lastBrowserOpenAt   time.Time
+	browserOpenMu sync.Mutex
+	// lastBrowserOpenAt 按窗口类型（主界面/设置）分别记录上次打开时间，做防抖去重；
+	// 分键是为了"刚开主界面又马上开设置窗口"时两者互不影响。
+	lastBrowserOpenAt   = map[string]time.Time{}
 	browserState        *AppState
 	activeAppBrowserExe string
-	// focusPrefsPending 是一次性标记：托盘点"设置"时置位，网页轮询 /api/state 读到后滚动到
-	// "界面偏好"区块并清除。这样无论界面窗口是已打开还是新开，点"设置"都能定位到偏好设置。
-	focusPrefsPending atomic.Bool
 )
 
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口
@@ -84,7 +82,7 @@ func main() {
 	// 延迟打开浏览器，等服务先就绪
 	go func() {
 		time.Sleep(300 * time.Millisecond)
-		openBrowser(url)
+		openBrowser(mainWindowTitles, url)
 	}()
 
 	// 上次退出时服务在运行，则自动恢复代理服务
@@ -150,24 +148,27 @@ func containsStr(s, sub string) bool {
 // 用户在托盘设置中选择系统默认浏览器时，会先解析 Windows 默认浏览器，再尽量用独立窗口打开。
 // 不指定 --user-data-dir：沿用用户默认浏览器配置，避免新配置目录触发"同步浏览数据"等首启登录提示；
 // "完全退出"时由 closeAppWindows 按窗口标题精确关闭本应用窗口（见 tray_windows.go）。
-func openBrowser(url string) {
+// openBrowser 打开指定界面窗口（titles 为该窗口的标题集合，用于"已打开则聚焦"判断；
+// extra 为追加给浏览器的参数，仅应用模式生效，例如设置窗口用 --window-size 控制尺寸）。
+func openBrowser(titles []string, url string, extra ...string) {
 	browserOpenMu.Lock()
 	defer browserOpenMu.Unlock()
 
-	if showAppWindow() {
+	if focusAppWindow(titles) {
 		return
 	}
-	if time.Since(lastBrowserOpenAt) < 2*time.Second {
+	key := titles[0]
+	if time.Since(lastBrowserOpenAt[key]) < 2*time.Second {
 		return
 	}
-	lastBrowserOpenAt = time.Now()
+	lastBrowserOpenAt[key] = time.Now()
 
 	choice := browserSystem
 	if browserState != nil {
 		choice = browserState.GetBrowserChoice()
 	}
 	if browser, ok := findInstalledBrowser(choice); ok {
-		cmd := exec.Command(browser.Path, browserArgs(browser, url)...)
+		cmd := exec.Command(browser.Path, browserArgs(browser, url, extra...)...)
 		if cmd.Start() == nil {
 			if browser.AppMode {
 				activeAppBrowserExe = browser.ExeName

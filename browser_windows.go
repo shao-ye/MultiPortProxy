@@ -232,9 +232,10 @@ func browserIDFromProgID(output string) string {
 	return ""
 }
 
-func browserArgs(browser browserInfo, url string) []string {
+// browserArgs 组装浏览器命令行参数。extra 为追加参数（仅应用模式生效，例如设置窗口用 --window-size 控制尺寸）。
+func browserArgs(browser browserInfo, url string, extra ...string) []string {
 	if browser.AppMode {
-		return []string{"--app=" + url}
+		return append([]string{"--app=" + url}, extra...)
 	}
 	if browser.ExeName == "firefox.exe" {
 		return []string{"--new-window", url}

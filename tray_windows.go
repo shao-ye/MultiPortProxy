@@ -143,7 +143,7 @@ const (
 	tpmRightButton = 0x0002
 
 	menuShow     = 1 // 托盘右键菜单：显示界面
-	menuSettings = 3 // 托盘右键菜单：设置（打开网页界面的"界面偏好"区块）
+	menuSettings = 3 // 托盘右键菜单：设置（打开独立的网页设置窗口）
 	menuExit     = 2 // 托盘右键菜单：完全退出
 )
 
@@ -207,7 +207,18 @@ var (
 	dialogShowing bool // 正在显示关闭询问/设置对话框时为 true，避免重复弹出
 )
 
-var appWindowTitles = []string{"多节点端口代理", "MultiPortProxy"}
+// 界面窗口标题集合：主界面与独立设置窗口各一组（中/英），用于精确匹配本应用窗口。
+// 设置窗口标题须与 web/settings.html 的 <title>/docTitle 完全一致。
+var (
+	mainWindowTitles     = []string{"多节点端口代理", "MultiPortProxy"}
+	settingsWindowTitles = []string{"设置 - 多节点端口代理", "Settings - MultiPortProxy"}
+)
+
+// allWindowTitles 返回主界面 + 设置窗口的全部标题（"完全退出"时据此关闭所有界面窗口）。
+func allWindowTitles() []string {
+	titles := append([]string{}, mainWindowTitles...)
+	return append(titles, settingsWindowTitles...)
+}
 
 func trayLanguage() string {
 	if traySt == nil {
@@ -227,13 +238,13 @@ func trayAppName() string {
 	return trayText("多节点端口代理", "MultiPortProxy")
 }
 
-// windowTitleMatchesApp 判断窗口标题是否正是本应用界面窗口的标题。
-// 必须用"精确相等"而非"包含"：app 模式窗口标题就是网页 <title>（中文"多节点端口代理"/英文"MultiPortProxy"），
+// windowTitleMatches 判断窗口标题是否精确等于 enumTitles（本轮枚举的目标标题集合）中的某一项。
+// 必须用"精确相等"而非"包含"：app 模式窗口标题就是网页 <title>（如"多节点端口代理"/"MultiPortProxy"），
 // 而官网标题"MultiPortProxy · 多节点端口代理"同时包含这两者——用包含匹配会误把用户开着官网的普通浏览器窗口
 // 当成应用窗口，导致还原(缩小)该窗口并误判"应用已打开"。
-func windowTitleMatchesApp(title string) bool {
-	for _, appTitle := range appWindowTitles {
-		if title == appTitle {
+func windowTitleMatches(title string) bool {
+	for _, want := range enumTitles {
+		if title == want {
 			return true
 		}
 	}
@@ -344,9 +355,8 @@ func showTrayMenu(hwnd uintptr) {
 	case menuShow:
 		showOrOpenAppWindow(trayURL)
 	case menuSettings:
-		// 设置已迁移到网页界面：置位一次性标记，打开/聚焦界面后由网页滚动到"界面偏好"区块
-		focusPrefsPending.Store(true)
-		showOrOpenAppWindow(trayURL + "#prefs")
+		// 设置是独立的网页设置窗口（与主界面分开），已开则聚焦，否则新开
+		showOrOpenSettingsWindow(trayURL + "/settings.html")
 	case menuExit:
 		trayExit()
 	}
@@ -387,10 +397,11 @@ func trayExit() {
 	os.Exit(0)
 }
 
-// enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄
+// enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄；enumTitles 是本轮匹配的目标标题集合
 var (
 	enumFoundWindows    []syscall.Handle
 	enumBrowserExeNames map[string]bool
+	enumTitles          []string
 )
 
 func windowProcessBaseName(hwnd uintptr) string {
@@ -415,7 +426,7 @@ func windowProcessBaseName(hwnd uintptr) string {
 }
 
 // enumWindowsProc 是 EnumWindows 的回调：按"标题精确等于应用界面标题 + Chromium 顶层窗口类 + 目标浏览器进程"匹配本应用窗口。
-// 标题须精确相等以排除"开着官网的普通浏览器窗口"（见 windowTitleMatchesApp）。
+// 标题须精确相等以排除"开着官网的普通浏览器窗口"（见 windowTitleMatches）。
 func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	visible, _, _ := procIsWindowVisible.Call(hwnd)
 	if visible == 0 {
@@ -427,7 +438,7 @@ func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 	var cls [128]uint16
 	procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&cls[0])), uintptr(len(cls)))
 	classText := syscall.UTF16ToString(cls[:])
-	if !windowTitleMatchesApp(titleText) || !strings.HasPrefix(classText, chromiumWindowClass) {
+	if !windowTitleMatches(titleText) || !strings.HasPrefix(classText, chromiumWindowClass) {
 		return 1
 	}
 	if !enumBrowserExeNames[windowProcessBaseName(hwnd)] {
@@ -439,14 +450,21 @@ func enumWindowsProc(hwnd uintptr, lparam uintptr) uintptr {
 
 var enumWindowsProcCB = syscall.NewCallback(enumWindowsProc)
 
-func appWindows() []syscall.Handle {
+// appWindowsMatching 枚举标题命中 titles 的本应用界面窗口句柄
+func appWindowsMatching(titles []string) []syscall.Handle {
 	enumFoundWindows = nil
+	enumTitles = titles
 	enumBrowserExeNames = browserAppWindowExeNames()
 	if len(enumBrowserExeNames) == 0 {
 		return nil
 	}
 	procEnumWindows.Call(enumWindowsProcCB, 0)
 	return append([]syscall.Handle(nil), enumFoundWindows...)
+}
+
+// appWindows 返回全部界面窗口（主界面 + 设置窗口），供"完全退出"统一关闭
+func appWindows() []syscall.Handle {
+	return appWindowsMatching(allWindowTitles())
 }
 
 func browserAppWindowExeNames() map[string]bool {
@@ -462,8 +480,9 @@ func browserAppWindowExeNames() map[string]bool {
 	return names
 }
 
-func showAppWindow() bool {
-	windows := appWindows()
+// focusAppWindow 把标题命中 titles 的窗口还原并置前；存在多个时只留一个、关掉多余的。返回是否找到窗口。
+func focusAppWindow(titles []string) bool {
+	windows := appWindowsMatching(titles)
 	if len(windows) == 0 {
 		return false
 	}
@@ -476,11 +495,25 @@ func showAppWindow() bool {
 	return true
 }
 
+// showAppWindow 聚焦主界面窗口（供单实例唤起复用）
+func showAppWindow() bool {
+	return focusAppWindow(mainWindowTitles)
+}
+
+// showOrOpenAppWindow 显示主界面窗口：已开则聚焦，否则新开
 func showOrOpenAppWindow(url string) {
-	if showAppWindow() {
+	if focusAppWindow(mainWindowTitles) {
 		return
 	}
-	openBrowser(url)
+	openBrowser(mainWindowTitles, url)
+}
+
+// showOrOpenSettingsWindow 显示独立设置窗口：已开则聚焦，否则以较小尺寸新开
+func showOrOpenSettingsWindow(url string) {
+	if focusAppWindow(settingsWindowTitles) {
+		return
+	}
+	openBrowser(settingsWindowTitles, url, "--window-size=520,560")
 }
 
 // closeAppWindows 关闭本应用的浏览器 app 模式界面窗口（"完全退出"时调用）。
