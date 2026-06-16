@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -25,6 +26,9 @@ var (
 	lastBrowserOpenAt   time.Time
 	browserState        *AppState
 	activeAppBrowserExe string
+	// focusPrefsPending 是一次性标记：托盘点"设置"时置位，网页轮询 /api/state 读到后滚动到
+	// "界面偏好"区块并清除。这样无论界面窗口是已打开还是新开，点"设置"都能定位到偏好设置。
+	focusPrefsPending atomic.Bool
 )
 
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口

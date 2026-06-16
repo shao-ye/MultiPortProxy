@@ -439,6 +439,7 @@ async function refresh() {
   renderTopbar();
   renderNodes();
   syncPrefValues(); // 同步界面偏好下拉框的选中项（关闭行为可能在托盘"记住选择"时被改动）
+  if (state.focusPrefs) scrollToPrefs(); // 托盘点"设置"后定位到界面偏好
   if (!settingsLoaded) {
     document.getElementById('setCorePath').value = state.settings.corePath || '';
     document.getElementById('setXrayPath').value = state.settings.xrayPath || '';
@@ -684,6 +685,12 @@ async function refreshLogs() {
   } catch (e) {}
 }
 
+// 平滑滚动并定位到"界面偏好"卡片（托盘点"设置"或带 #prefs 锚点打开时调用）
+function scrollToPrefs() {
+  const card = document.getElementById('prefsCard');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 /* ================= 定时轮询 ================= */
 refresh();
 loadPrefs();
@@ -691,13 +698,11 @@ refreshLogs();
 setInterval(refresh, 3000);
 setInterval(refreshLogs, 2000);
 
-// 托盘"设置"菜单以 #prefs 锚点打开界面：定位到界面偏好区块
-if (location.hash === '#prefs') {
-  setTimeout(() => {
-    const card = document.getElementById('prefsCard');
-    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 300);
-}
+// 界面窗口被托盘重新聚焦时立即拉一次状态，使"设置"定位无需等待轮询间隔
+window.addEventListener('focus', refresh);
+
+// 带 #prefs 锚点打开时也直接定位一次（新开窗口的兜底）
+if (location.hash === '#prefs') setTimeout(scrollToPrefs, 300);
 
 /* ================= 窗口关闭信标 =================
    界面是 Edge --app 窗口，点右上角 X 只会关掉窗口，后台 Go 进程仍在运行。

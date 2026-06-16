@@ -344,7 +344,8 @@ func showTrayMenu(hwnd uintptr) {
 	case menuShow:
 		showOrOpenAppWindow(trayURL)
 	case menuSettings:
-		// 设置已迁移到网页界面：打开界面并定位到"界面偏好"区块
+		// 设置已迁移到网页界面：置位一次性标记，打开/聚焦界面后由网页滚动到"界面偏好"区块
+		focusPrefsPending.Store(true)
 		showOrOpenAppWindow(trayURL + "#prefs")
 	case menuExit:
 		trayExit()
