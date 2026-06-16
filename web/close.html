@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 独立关闭确认窗口：标题须与 tray_windows.go 的 closePromptTitles 精确一致，供托盘定位/关闭 -->
+<link rel="icon" type="image/png" href="favicon.png">
+<title>退出 - 多节点端口代理</title>
+<style>
+  /* ---------- 深色主题（与设置窗一致） ---------- */
+  html { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #16181d; color: #d8dbe2; font-size: 14px;
+    padding: 24px 28px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 14px; }
+  .desc { color: #aab0bd; font-size: 13px; line-height: 1.7; }
+  .desc b { color: #d8dbe2; font-weight: 600; }
+
+  .actions { display: flex; gap: 12px; margin-top: 24px; }
+  button {
+    flex: 1; border: 1px solid #3a3f4d; border-radius: 8px;
+    padding: 11px 16px; font-size: 14px; cursor: pointer;
+    background: #2a2e38; color: #d8dbe2;
+  }
+  button:hover { background: #353a47; }
+  button.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  button.primary:hover { background: #2563eb; }
+  button.danger { background: #3d1a1a; border-color: #7f1d1d; color: #fca5a5; }
+  button.danger:hover { background: #7f1d1d; color: #fff; }
+
+  .remember { display: flex; align-items: center; gap: 8px; margin-top: 20px; color: #aab0bd; font-size: 13px; cursor: pointer; }
+  .remember input { width: 15px; height: 15px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1 id="title">关闭窗口后，你希望如何处理本程序？</h1>
+<div class="desc" id="desc"></div>
+
+<div class="actions">
+  <button class="danger" id="btnExit" onclick="choose('exit')">完全退出</button>
+  <button class="primary" id="btnTray" onclick="choose('tray')">最小化到托盘</button>
+</div>
+
+<label class="remember">
+  <input type="checkbox" id="remember">
+  <span id="rememberLabel">记住我的选择，不再询问</span>
+</label>
+
+<script>
+/* ================= 独立关闭确认窗口逻辑 ================= */
+// 语言由托盘打开窗口时通过 ?lang= 传入，无需额外请求，可即时渲染。
+const langCur = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'zh-CN';
+
+const T = {
+  'zh-CN': {
+    title: '关闭窗口后，你希望如何处理本程序？',
+    desc: '<b>完全退出</b>：停止代理服务并结束程序<br><b>最小化到托盘</b>：保留后台代理服务，可随时从托盘恢复',
+    exit: '完全退出',
+    tray: '最小化到托盘',
+    remember: '记住我的选择，不再询问',
+  },
+  en: {
+    title: 'What should happen when the window is closed?',
+    desc: '<b>Exit</b>: stop the proxy service and quit the app<br><b>Minimize to tray</b>: keep the proxy running in the background, restore anytime from the tray',
+    exit: 'Exit',
+    tray: 'Minimize to tray',
+    remember: 'Remember my choice',
+  },
+};
+function t(k) { return (T[langCur] && T[langCur][k]) || T['zh-CN'][k] || k; }
+
+function render() {
+  document.documentElement.lang = langCur;
+  document.title = langCur === 'en' ? 'Exit - MultiPortProxy' : '退出 - 多节点端口代理';
+  document.getElementById('title').textContent = t('title');
+  document.getElementById('desc').innerHTML = t('desc');
+  document.getElementById('btnExit').textContent = t('exit');
+  document.getElementById('btnTray').textContent = t('tray');
+  document.getElementById('rememberLabel').textContent = t('remember');
+}
+
+// 选择后通知后端，由后端按选择执行（exit 退出进程；tray 关闭本窗口并最小化）。
+// 本窗口自身不发送 /api/ui-closed，避免用户直接关掉本窗口时再次触发询问。
+let choosing = false;
+async function choose(action) {
+  if (choosing) return;
+  choosing = true;
+  document.getElementById('btnExit').disabled = true;
+  document.getElementById('btnTray').disabled = true;
+  document.body.style.opacity = '0.6';
+  try {
+    await fetch('/api/close-choice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, remember: document.getElementById('remember').checked }),
+    });
+  } catch (e) {}
+}
+
+render();
+</script>
+</body>
+</html>

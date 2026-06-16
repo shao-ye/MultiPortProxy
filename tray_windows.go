@@ -25,7 +25,6 @@ var appIcoData []byte
 var (
 	user32  = syscall.NewLazyDLL("user32.dll")
 	shell32 = syscall.NewLazyDLL("shell32.dll")
-	gdi32   = syscall.NewLazyDLL("gdi32.dll")
 
 	procGetModuleHandleW    = kernel32.NewProc("GetModuleHandleW")
 	procRegisterClassExW    = user32.NewProc("RegisterClassExW")
@@ -45,6 +44,8 @@ var (
 	procGetCursorPos        = user32.NewProc("GetCursorPos")
 	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
 	procSetWindowPos        = user32.NewProc("SetWindowPos")
+	procGetSystemMetrics    = user32.NewProc("GetSystemMetrics")
+	procShowWindow          = user32.NewProc("ShowWindow")
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 
@@ -53,15 +54,6 @@ var (
 	procGetClassNameW            = user32.NewProc("GetClassNameW")
 	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
 	procGetWindowThreadProcessID = user32.NewProc("GetWindowThreadProcessId")
-
-	// 自定义对话框（关闭询问 / 设置）所需
-	procDestroyWindow    = user32.NewProc("DestroyWindow")
-	procSendMessageW     = user32.NewProc("SendMessageW")
-	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
-	procShowWindow       = user32.NewProc("ShowWindow")
-	procGetStockObject   = gdi32.NewProc("GetStockObject")
-	procCreateFontW      = gdi32.NewProc("CreateFontW")
-	procSetBkMode        = gdi32.NewProc("SetBkMode")
 )
 
 // ---------- 常量 ----------
@@ -69,60 +61,21 @@ const (
 	wmApp          = 0x8000
 	wmTrayCallback = wmApp + 1 // 托盘图标的鼠标事件回调消息
 	wmShowCloseTip = wmApp + 2 // 自定义消息：在托盘线程弹出"已最小化"气泡
-	wmAskClose     = wmApp + 3 // 自定义消息：在托盘线程弹出"关闭方式"询问对话框
+	wmCloseChoice  = wmApp + 3 // 自定义消息：在托盘线程处理关闭确认窗口的选择
 
-	wmClose          = 0x0010
-	wmCommand        = 0x0111
-	wmSetFont        = 0x0030
-	wmCtlColorStatic = 0x0138 // STATIC 控件绘制前询问父窗口要画刷/文字色
-
-	transparentBkMode = 1 // SetBkMode：TRANSPARENT，文字背景不填充
-	whiteBrush        = 0  // GetStockObject：WHITE_BRUSH
+	wmClose         = 0x0010
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
 	wmRButtonUp     = 0x0205
 	wmDestroy       = 0x0002
 
-	bmGetCheck = 0x00F0
-	bstChecked = 1
-
-	// 窗口/控件样式
-	wsChild           = 0x40000000
-	wsVisible         = 0x10000000
-	wsTabStop         = 0x00010000
-	wsCaption         = 0x00C00000
-	wsSysMenu         = 0x00080000
-	wsExDlgModalFrame = 0x00000001
-	wsExTopmost       = 0x00000008
-	wsExToolWindow    = 0x00000080
-	bsPushButton      = 0x00000000
-	bsDefPushButton   = 0x00000001
-	bsAutoCheckBox    = 0x00000003
-	bsGroupBox        = 0x00000007
-	ssLeft            = 0x00000000
-
-	defaultGuiFont = 17
-
-	// Segoe UI 字体字重（CreateFontW 的 cWeight 参数）
-	fwNormal = 400 // 正文常规
-	// CreateFontW 其它固定参数
-	defaultCharset   = 1 // DEFAULT_CHARSET：让系统按字符自动做 CJK 字体回退
-	clearTypeQuality = 5 // CLEARTYPE_QUALITY：开启抗锯齿，文字更顺滑
-
 	smCxScreen = 0
-	smCyScreen     = 1
-	swShow         = 5
-	swRestore      = 9
+	smCyScreen = 1
+	swRestore  = 9
 
 	swpNoZorder = 0x0004 // SetWindowPos：保持 Z 序不变（只移动/调整大小）
 
-	// 对话框控件 ID
-	idExitBtn  = 101 // 关闭询问：完全退出
-	idTrayBtn  = 102 // 关闭询问：最小化到托盘
-	idRemember = 103 // 关闭询问：记住选择 勾选框
-
-	// appWindowTitle 是浏览器 app 模式界面窗口的标题（取自网页 <title>），用于精确定位本应用窗口
-	// chromiumWindowClass 是 Chromium 顶层窗口的窗口类名，配合标题排除本应用自己的隐藏托盘窗口
+	// chromiumWindowClass 是 Chromium 顶层窗口的窗口类名，配合页面标题排除本应用自己的隐藏托盘窗口
 	chromiumWindowClass = "Chrome_WidgetWin_1"
 
 	nimAdd    = 0x0000
@@ -207,8 +160,6 @@ var (
 	traySt       *AppState // 全局应用状态，托盘读写关闭行为设置
 	closeTipOnce sync.Once
 	wndProcCB    = syscall.NewCallback(wndProc)
-
-	dialogShowing bool // 正在显示关闭询问/设置对话框时为 true，避免重复弹出
 )
 
 // 界面窗口标题集合：主界面与独立设置窗口各一组（中/英），用于精确匹配本应用窗口。
@@ -216,12 +167,14 @@ var (
 var (
 	mainWindowTitles     = []string{"多节点端口代理", "MultiPortProxy"}
 	settingsWindowTitles = []string{"设置 - 多节点端口代理", "Settings - MultiPortProxy"}
+	closePromptTitles    = []string{"退出 - 多节点端口代理", "Exit - MultiPortProxy"}
 )
 
-// allWindowTitles 返回主界面 + 设置窗口的全部标题（"完全退出"时据此关闭所有界面窗口）。
+// allWindowTitles 返回主界面 + 设置窗口 + 关闭确认窗口的全部标题（"完全退出"时据此关闭所有界面窗口）。
 func allWindowTitles() []string {
 	titles := append([]string{}, mainWindowTitles...)
-	return append(titles, settingsWindowTitles...)
+	titles = append(titles, settingsWindowTitles...)
+	return append(titles, closePromptTitles...)
 }
 
 func trayLanguage() string {
@@ -298,9 +251,6 @@ func loadAppIcon(hInstance uintptr) syscall.Handle {
 func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	switch msg {
 	case wmTrayCallback:
-		if dialogShowing {
-			return 0 // 对话框打开期间不响应托盘交互
-		}
 		// lParam 低位是具体的鼠标事件
 		switch uint32(lparam) {
 		case wmLButtonUp, wmLButtonDblClk:
@@ -312,17 +262,16 @@ func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
 	case wmShowCloseTip:
 		showCloseTip()
 		return 0
-	case wmAskClose:
-		// 关闭界面窗口时弹出"完全退出/最小化到托盘"询问对话框
-		if dialogShowing {
-			return 0
-		}
-		dialogShowing = true
-		action, remember := showCloseDialog()
-		dialogShowing = false
+	case wmCloseChoice:
+		// 处理网页关闭确认窗口回传的选择（在托盘线程执行，安全访问 trayNID）
+		pendingCloseMu.Lock()
+		action := pendingCloseAction
+		remember := pendingCloseRemember
+		pendingCloseMu.Unlock()
 		if remember && (action == "exit" || action == "tray") {
 			traySt.SetCloseAction(action) // 勾选"记住"则持久化此选择
 		}
+		closePromptWindow() // 关掉关闭确认窗口本身
 		if action == "exit" {
 			trayExit()
 		} else {
@@ -516,10 +465,12 @@ func showOrOpenAppWindow(url string) {
 	openBrowser(mainWindowTitles, url)
 }
 
-// 设置窗口的目标尺寸（逻辑像素，96 DPI 基准）：刚好容纳三项下拉框，避免大片留白
+// 独立窗口的目标尺寸（逻辑像素，96 DPI 基准）
 const (
-	settingsWinW = 560
+	settingsWinW = 560 // 设置窗：刚好容纳三项下拉框
 	settingsWinH = 470
+	closeWinW    = 480 // 关闭确认窗：两个按钮 + 说明 + 记住勾选
+	closeWinH    = 340
 )
 
 // showOrOpenSettingsWindow 显示独立设置窗口：已开则聚焦，否则新开并调整为居中小窗。
@@ -527,19 +478,34 @@ func showOrOpenSettingsWindow(url string) {
 	if focusAppWindow(settingsWindowTitles) {
 		return
 	}
-	// --window-size 仅在浏览器新起进程时生效；多数情况下设置窗与主界面同进程，会被忽略，
-	// 故新开后再用 SetWindowPos 兜底把窗口调成居中小窗（见 centerSettingsWindowWhenReady）。
 	openBrowser(settingsWindowTitles, url, "--window-size=560,470")
-	go centerSettingsWindowWhenReady()
+	go centerWindowWhenReady(settingsWindowTitles, settingsWinW, settingsWinH)
 }
 
-// centerSettingsWindowWhenReady 轮询等待设置窗口出现（浏览器异步创建），出现后将其调整为屏幕居中的小窗。
+// showOrOpenClosePromptWindow 弹出独立的网页关闭确认窗口：已开则聚焦，否则新开并调整为居中小窗。
+func showOrOpenClosePromptWindow(url string) {
+	if focusAppWindow(closePromptTitles) {
+		return
+	}
+	openBrowser(closePromptTitles, url, "--window-size=480,340")
+	go centerWindowWhenReady(closePromptTitles, closeWinW, closeWinH)
+}
+
+// closePromptWindow 关闭网页关闭确认窗口（用户选择"最小化到托盘"后调用）
+func closePromptWindow() {
+	for _, h := range appWindowsMatching(closePromptTitles) {
+		procPostMessageW.Call(uintptr(h), wmClose, 0, 0)
+	}
+}
+
+// centerWindowWhenReady 轮询等待标题命中 titles 的窗口出现（浏览器异步创建），出现后调整为屏幕居中的 w×h 小窗。
+// --window-size 仅在浏览器新起进程时生效，多数情况下与主界面同进程会被忽略，故这里用 SetWindowPos 兜底。
 // 在协程中执行，避免阻塞托盘消息循环。
-func centerSettingsWindowWhenReady() {
+func centerWindowWhenReady(titles []string, w, h int) {
 	sw, _, _ := procGetSystemMetrics.Call(smCxScreen)
 	sh, _, _ := procGetSystemMetrics.Call(smCyScreen)
-	x := (int(sw) - settingsWinW) / 2
-	y := (int(sh) - settingsWinH) / 2
+	x := (int(sw) - w) / 2
+	y := (int(sh) - h) / 2
 	if x < 0 {
 		x = 0
 	}
@@ -547,11 +513,11 @@ func centerSettingsWindowWhenReady() {
 		y = 0
 	}
 	for i := 0; i < 40; i++ { // 最多约 4 秒
-		if wins := appWindowsMatching(settingsWindowTitles); len(wins) > 0 {
+		if wins := appWindowsMatching(titles); len(wins) > 0 {
 			// 先还原（若窗口继承了主界面的最大化状态，直接 SetWindowPos 不会缩小），再居中调整尺寸
 			procShowWindow.Call(uintptr(wins[0]), swRestore)
 			procSetWindowPos.Call(uintptr(wins[0]), 0,
-				uintptr(x), uintptr(y), uintptr(settingsWinW), uintptr(settingsWinH), swpNoZorder)
+				uintptr(x), uintptr(y), uintptr(w), uintptr(h), swpNoZorder)
 			return
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -571,9 +537,9 @@ func closeAppWindows() {
 // trayOnUIClose 由 /api/ui-closed 在界面窗口关闭时调用，按 CloseAction 设置决定行为：
 //   - exit：直接完全退出
 //   - tray：最小化到托盘（首次给气泡提示）
-//   - ask（默认）：弹出询问对话框
+//   - ask（默认）：弹出独立的网页关闭确认窗口
 //
-// UI 操作统一通过 PostMessage 投递回托盘线程执行，避免跨线程操作窗口/托盘。
+// 触碰托盘图标状态的操作通过 PostMessage 投递回托盘线程执行，避免跨线程访问 trayNID。
 func trayOnUIClose() {
 	if trayHwnd == 0 || traySt == nil {
 		return
@@ -585,9 +551,28 @@ func trayOnUIClose() {
 		closeTipOnce.Do(func() {
 			procPostMessageW.Call(uintptr(trayHwnd), wmShowCloseTip, 0, 0)
 		})
-	default: // ask
-		procPostMessageW.Call(uintptr(trayHwnd), wmAskClose, 0, 0)
+	default: // ask：弹出网页关闭确认窗口（语言随当前界面语言）
+		showOrOpenClosePromptWindow(trayURL + "/close.html?lang=" + trayLanguage())
 	}
+}
+
+// 关闭确认窗口的选择结果（由 HTTP 协程写入、托盘线程读取），用 PostMessage 衔接两侧线程。
+var (
+	pendingCloseMu       sync.Mutex
+	pendingCloseAction   string
+	pendingCloseRemember bool
+)
+
+// trayOnCloseChoice 由 /api/close-choice 调用：记录选择并通知托盘线程处理。
+func trayOnCloseChoice(action string, remember bool) {
+	if trayHwnd == 0 {
+		return
+	}
+	pendingCloseMu.Lock()
+	pendingCloseAction = action
+	pendingCloseRemember = remember
+	pendingCloseMu.Unlock()
+	procPostMessageW.Call(uintptr(trayHwnd), wmCloseChoice, 0, 0)
 }
 
 // runTray 在主线程创建隐藏窗口与托盘图标，并进入消息循环（阻塞直到「完全退出」）。
@@ -643,180 +628,6 @@ func runTray(url string, st *AppState) {
 	trayExit()
 }
 
-// ---------- 自定义对话框（关闭询问 / 设置）----------
-// 纯 Win32 自绘对话框：标准 MessageBox 不支持"记住选择"勾选框，
-// 而 TaskDialog 需要 ComCtl32 v6 清单依赖，故这里手动创建窗口+控件实现，保持零依赖且可在调试构建中正常运行。
-
-var (
-	dlgDone         bool           // 对话框是否已得到结果
-	dlgClickedID    uint32         // 被点击的按钮控件 ID（0 表示直接关闭）
-	dlgCheckHwnd    syscall.Handle // "记住选择"勾选框句柄（无则为 0）
-	dlgClassOnce    sync.Once
-	dlgClassNamePtr = utf16Ptr("NodePortProxyDlg")
-	dlgProcCB       = syscall.NewCallback(dlgProc)
-)
-
-// dlgProc 是自定义对话框的消息处理函数
-func dlgProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
-	switch msg {
-	case wmCtlColorStatic:
-		// 让 STATIC 文本背景透明并返回白色画刷，避免在白色窗口上出现灰色底条
-		procSetBkMode.Call(wparam, transparentBkMode)
-		br, _, _ := procGetStockObject.Call(whiteBrush)
-		return br
-	case wmCommand:
-		id := uint32(wparam) & 0xFFFF
-		if id == idRemember {
-			return 0 // 勾选框：自动切换状态即可，不结束对话框
-		}
-		// 仅置标志，窗口销毁推迟到调用方读取完勾选框状态后再做，
-		// 否则 DestroyWindow 会连带销毁勾选框，导致读不到"记住"状态
-		dlgClickedID = id
-		dlgDone = true
-		return 0
-	case wmClose:
-		// 直接关闭对话框（点对话框自身的 X 或 Esc）：视为"最小化到托盘"，不记忆
-		dlgClickedID = 0
-		dlgDone = true
-		return 0
-	}
-	r, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wparam, lparam)
-	return r
-}
-
-// registerDlgClassOnce 注册对话框窗口类（仅一次）
-func registerDlgClassOnce(hInstance uintptr) {
-	dlgClassOnce.Do(func() {
-		var wc wndClassExW
-		wc.cbSize = uint32(unsafe.Sizeof(wc))
-		wc.lpfnWndProc = dlgProcCB
-		wc.hInstance = syscall.Handle(hInstance)
-		wc.hbrBackground = syscall.Handle(6) // COLOR_WINDOW+1，与系统对话框背景一致
-		wc.hIcon = loadAppIcon(hInstance)
-		wc.lpszClassName = dlgClassNamePtr
-		procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
-	})
-}
-
-// createDlg 创建一个屏幕居中、置顶的对话框窗口（不在任务栏显示）
-func createDlg(hInstance uintptr, title string, w, h int) uintptr {
-	registerDlgClassOnce(hInstance)
-	sw, _, _ := procGetSystemMetrics.Call(smCxScreen)
-	sh, _, _ := procGetSystemMetrics.Call(smCyScreen)
-	x := (int(sw) - w) / 2
-	y := (int(sh) - h) / 2
-	hwnd, _, _ := procCreateWindowExW.Call(
-		wsExDlgModalFrame|wsExTopmost|wsExToolWindow,
-		uintptr(unsafe.Pointer(dlgClassNamePtr)),
-		uintptr(unsafe.Pointer(utf16Ptr(title))),
-		wsCaption|wsSysMenu,
-		uintptr(x), uintptr(y), uintptr(w), uintptr(h),
-		0, 0, hInstance, 0,
-	)
-	return hwnd
-}
-
-// ---------- 现代化字体 ----------
-// 系统自带的 DEFAULT_GUI_FONT 是老式点阵字体（观感陈旧），这里统一改用 Windows 现代界面字体
-// Segoe UI（中文由系统字体回退渲染），并按字号/字重缓存复用。
-
-var (
-	uiFontOnce sync.Once
-	uiFont     uintptr // 正文：Segoe UI 9pt 常规
-)
-
-// makeUIFont 创建一个指定字号(pt)与字重的 Segoe UI 字体。
-// 返回的 HFONT 为进程内长期复用的 GDI 资源，不主动释放（进程退出时由系统回收）。
-func makeUIFont(pt, weight int) uintptr {
-	// 96 DPI 下把磅值换算为逻辑高度；负值表示按字符高度（而非单元格高度）取字号
-	height := -(pt * 96) / 72
-	name := utf16Ptr("Segoe UI")
-	h, _, _ := procCreateFontW.Call(
-		uintptr(int32(height)), 0, 0, 0, uintptr(weight),
-		0, 0, 0, // 斜体 / 下划线 / 删除线
-		defaultCharset, 0, 0, clearTypeQuality, 0,
-		uintptr(unsafe.Pointer(name)),
-	)
-	return h
-}
-
-// ensureUIFonts 惰性初始化界面字体（仅一次）
-func ensureUIFonts() {
-	uiFontOnce.Do(func() {
-		uiFont = makeUIFont(9, fwNormal)
-	})
-}
-
-// dlgAddControl 在对话框上创建一个子控件（STATIC 文本 / BUTTON 按钮或勾选框），并应用现代界面字体
-func dlgAddControl(parent, hInstance uintptr, class, text string, style uintptr, id uintptr, x, y, w, h int) syscall.Handle {
-	ensureUIFonts()
-	hctl, _, _ := procCreateWindowExW.Call(
-		0,
-		uintptr(unsafe.Pointer(utf16Ptr(class))),
-		uintptr(unsafe.Pointer(utf16Ptr(text))),
-		style,
-		uintptr(x), uintptr(y), uintptr(w), uintptr(h),
-		parent, id, hInstance, 0,
-	)
-	procSendMessageW.Call(hctl, wmSetFont, uiFont, 1)
-	return syscall.Handle(hctl)
-}
-
-// runDlgModal 显示对话框并进入嵌套消息循环，直到对话框得到结果
-func runDlgModal(hwnd uintptr) {
-	procShowWindow.Call(hwnd, swShow)
-	procSetForegroundWindow.Call(hwnd)
-	var msg msgStruct
-	for !dlgDone {
-		r, _, _ := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
-		if int32(r) <= 0 {
-			break
-		}
-		procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
-		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
-	}
-}
-
-// dlgGetRemember 读取"记住选择"勾选框是否勾选
-func dlgGetRemember() bool {
-	if dlgCheckHwnd == 0 {
-		return false
-	}
-	r, _, _ := procSendMessageW.Call(uintptr(dlgCheckHwnd), bmGetCheck, 0, 0)
-	return r == bstChecked
-}
-
-// showCloseDialog 弹出"关闭方式"询问对话框，返回选择（"exit"/"tray"）与是否勾选记住
-func showCloseDialog() (string, bool) {
-	dlgDone = false
-	dlgClickedID = 0
-	dlgCheckHwnd = 0
-	hInstance, _, _ := procGetModuleHandleW.Call(0)
-	hwnd := createDlg(hInstance, trayText("退出 - 多节点端口代理", "Exit - MultiPortProxy"), 430, 252)
-	dlgAddControl(hwnd, hInstance, "STATIC",
-		trayText(
-			"关闭窗口后，你希望如何处理本程序？\r\n\r\n- 完全退出：停止代理服务并结束程序\r\n- 最小化到托盘：保留后台代理服务，可随时从托盘恢复",
-			"What should happen when the window is closed?\r\n\r\n- Exit: stop proxy service and quit the app\r\n- Minimize to tray: keep proxy service running in the background",
-		),
-		wsChild|wsVisible|ssLeft, 0, 22, 18, 384, 104)
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("完全退出", "Exit"),
-		wsChild|wsVisible|wsTabStop|bsPushButton, idExitBtn, 44, 130, 150, 36)
-	dlgAddControl(hwnd, hInstance, "BUTTON", trayText("最小化到托盘", "Minimize to tray"),
-		wsChild|wsVisible|wsTabStop|bsDefPushButton, idTrayBtn, 216, 130, 170, 36)
-	dlgCheckHwnd = dlgAddControl(hwnd, hInstance, "BUTTON", trayText("记住我的选择，不再询问", "Remember my choice"),
-		wsChild|wsVisible|wsTabStop|bsAutoCheckBox, idRemember, 44, 178, 340, 26)
-	runDlgModal(hwnd)
-	remember := dlgGetRemember() // 必须在销毁窗口前读取勾选框状态
-	procDestroyWindow.Call(hwnd)
-	switch dlgClickedID {
-	case idExitBtn:
-		return "exit", remember
-	case idTrayBtn:
-		return "tray", remember
-	default:
-		return "tray", false // 直接关闭对话框 = 最小化到托盘，且不记忆
-	}
-}
-
-// 注：旧的原生"设置"对话框（关闭行为/界面浏览器/界面语言三项下拉框）已迁移到网页界面，
-// 由 /api/preferences 读写。托盘"设置"菜单改为打开界面并定位到"界面偏好"区块（见 showTrayMenu）。
+// 注：原先的两个原生 Win32 自绘对话框（设置、关闭确认）已全部迁移到网页窗口——
+// 设置见 web/settings.html + /api/preferences；关闭确认见 web/close.html + /api/close-choice。
+// 托盘只保留图标、右键菜单、气泡提示与界面窗口的开关/定位逻辑，不再手绘对话框。

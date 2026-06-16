@@ -35,6 +35,21 @@ func registerAPI(mux *http.ServeMux, st *AppState) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
+	// 关闭确认窗口的选择回调：action 为 "exit"/"tray"，remember 表示是否记住该选择。
+	// 由独立的网页关闭确认窗口（close.html）提交，交托盘线程执行实际动作。
+	mux.HandleFunc("/api/close-choice", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Action   string `json:"action"`
+			Remember bool   `json:"remember"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonErr(w, "请求格式错误")
+			return
+		}
+		trayOnCloseChoice(req.Action, req.Remember)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	// 获取完整状态：设置、节点列表、运行状态
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		st.mu.Lock()
