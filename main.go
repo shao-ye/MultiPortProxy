@@ -31,6 +31,9 @@ var (
 
 // main 程序入口：加载状态 → 启动本地 HTTP 服务 → 打开浏览器窗口
 func main() {
+	setProcessAppUserModelID()
+	ensureStartMenuShortcut()
+
 	st := LoadState()
 	browserState = st
 
@@ -155,6 +158,7 @@ func openBrowser(titles []string, url string, extra ...string) {
 	defer browserOpenMu.Unlock()
 
 	if focusAppWindow(titles) {
+		applyTaskbarIdentityWhenReady(titles)
 		return
 	}
 	key := titles[0]
@@ -172,9 +176,11 @@ func openBrowser(titles []string, url string, extra ...string) {
 		if cmd.Start() == nil {
 			if browser.AppMode {
 				activeAppBrowserExe = browser.ExeName
+				applyTaskbarIdentityWhenReady(titles)
 			}
 			return
 		}
 	}
 	_ = exec.Command("cmd", "/c", "start", "", url).Start()
+	applyTaskbarIdentityWhenReady(titles)
 }

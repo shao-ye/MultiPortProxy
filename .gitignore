@@ -4,6 +4,7 @@ runtime/
 
 # 编译产物
 *.exe
+*.exe~
 MultiPortProxy
 dist/
 
