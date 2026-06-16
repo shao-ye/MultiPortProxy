@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 
@@ -43,6 +44,7 @@ var (
 	procDestroyMenu         = user32.NewProc("DestroyMenu")
 	procGetCursorPos        = user32.NewProc("GetCursorPos")
 	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
+	procSetWindowPos        = user32.NewProc("SetWindowPos")
 
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 
@@ -111,6 +113,8 @@ const (
 	smCyScreen     = 1
 	swShow         = 5
 	swRestore      = 9
+
+	swpNoZorder = 0x0004 // SetWindowPos：保持 Z 序不变（只移动/调整大小）
 
 	// 对话框控件 ID
 	idExitBtn  = 101 // 关闭询问：完全退出
@@ -397,8 +401,10 @@ func trayExit() {
 	os.Exit(0)
 }
 
-// enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄；enumTitles 是本轮匹配的目标标题集合
+// enumFoundWindows 收集 EnumWindows 回调中匹配到的界面窗口句柄；enumTitles 是本轮匹配的目标标题集合。
+// enumMu 串行化整个枚举过程：这些是回调共享的包级变量，而枚举会被托盘线程与窗口轮询协程并发调用。
 var (
+	enumMu              sync.Mutex
 	enumFoundWindows    []syscall.Handle
 	enumBrowserExeNames map[string]bool
 	enumTitles          []string
@@ -452,6 +458,8 @@ var enumWindowsProcCB = syscall.NewCallback(enumWindowsProc)
 
 // appWindowsMatching 枚举标题命中 titles 的本应用界面窗口句柄
 func appWindowsMatching(titles []string) []syscall.Handle {
+	enumMu.Lock()
+	defer enumMu.Unlock()
 	enumFoundWindows = nil
 	enumTitles = titles
 	enumBrowserExeNames = browserAppWindowExeNames()
@@ -508,12 +516,46 @@ func showOrOpenAppWindow(url string) {
 	openBrowser(mainWindowTitles, url)
 }
 
-// showOrOpenSettingsWindow 显示独立设置窗口：已开则聚焦，否则以较小尺寸新开
+// 设置窗口的目标尺寸（逻辑像素，96 DPI 基准）
+const (
+	settingsWinW = 640
+	settingsWinH = 600
+)
+
+// showOrOpenSettingsWindow 显示独立设置窗口：已开则聚焦，否则新开并调整为居中小窗。
 func showOrOpenSettingsWindow(url string) {
 	if focusAppWindow(settingsWindowTitles) {
 		return
 	}
-	openBrowser(settingsWindowTitles, url, "--window-size=520,560")
+	// --window-size 仅在浏览器新起进程时生效；多数情况下设置窗与主界面同进程，会被忽略，
+	// 故新开后再用 SetWindowPos 兜底把窗口调成居中小窗（见 centerSettingsWindowWhenReady）。
+	openBrowser(settingsWindowTitles, url, "--window-size=640,600")
+	go centerSettingsWindowWhenReady()
+}
+
+// centerSettingsWindowWhenReady 轮询等待设置窗口出现（浏览器异步创建），出现后将其调整为屏幕居中的小窗。
+// 在协程中执行，避免阻塞托盘消息循环。
+func centerSettingsWindowWhenReady() {
+	sw, _, _ := procGetSystemMetrics.Call(smCxScreen)
+	sh, _, _ := procGetSystemMetrics.Call(smCyScreen)
+	x := (int(sw) - settingsWinW) / 2
+	y := (int(sh) - settingsWinH) / 2
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	for i := 0; i < 40; i++ { // 最多约 4 秒
+		if wins := appWindowsMatching(settingsWindowTitles); len(wins) > 0 {
+			// 先还原（若窗口继承了主界面的最大化状态，直接 SetWindowPos 不会缩小），再居中调整尺寸
+			procShowWindow.Call(uintptr(wins[0]), swRestore)
+			procSetWindowPos.Call(uintptr(wins[0]), 0,
+				uintptr(x), uintptr(y), uintptr(settingsWinW), uintptr(settingsWinH), swpNoZorder)
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // closeAppWindows 关闭本应用的浏览器 app 模式界面窗口（"完全退出"时调用）。
