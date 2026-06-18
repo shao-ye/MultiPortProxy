@@ -6,6 +6,7 @@
 
 [![项目主页](https://img.shields.io/badge/%E9%A1%B9%E7%9B%AE%E4%B8%BB%E9%A1%B5-mpp.shaoyeai.com-3b82f6?style=for-the-badge&logo=cloudflare&logoColor=white)](https://mpp.shaoyeai.com)
 [![下载](https://img.shields.io/github/v/release/shao-ye/MultiPortProxy?style=for-the-badge&label=%E4%B8%8B%E8%BD%BD&color=06b6d4&logo=windows&logoColor=white)](https://github.com/shao-ye/MultiPortProxy/releases/latest)
+[![Telegram](https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/MultiPortProxy)
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-34d399?style=for-the-badge)](LICENSE)
 
@@ -85,6 +86,10 @@ go build -ldflags "-H windowsgui" -o MultiPortProxy.exe .
 - **杀毒软件拦截 / 无法运行？**
   自行编译的无签名 exe 可能被 360、Windows Defender 等误报。把程序所在目录加入信任区/白名单即可。
 
+### 💬 交流与反馈
+
+欢迎加入 [Telegram 交流群](https://t.me/MultiPortProxy)，讨论使用问题、功能建议和版本更新。
+
 ### ❤️ 赞助支持
 
 开源不易，如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
@@ -140,6 +145,10 @@ Pure Go standard library, no third-party dependencies.
 ### License & cores
 
 Licensed under the [MIT License](LICENSE). This project only **invokes** the user's locally installed `mihomo` (GPL-3.0) and `xray` (MPL-2.0) cores via separate processes; it does **not** bundle, link, or redistribute them, and therefore is not a derivative work of either core.
+
+### 💬 Community
+
+Join the [Telegram group](https://t.me/MultiPortProxy) for support, feedback, and release updates.
 
 ### ❤️ Donate
 
