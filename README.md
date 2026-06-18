@@ -89,6 +89,12 @@ go build -ldflags "-H windowsgui" -o MultiPortProxy.exe .
 
 开源不易，如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
 
+国际用户可以通过 GitHub Sponsors 支持项目：
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-%E8%B5%9E%E5%8A%A9%E9%A1%B9%E7%9B%AE-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/shao-ye)
+
+中国大陆用户可以使用微信或支付宝：
+
 [![请我喝杯咖啡](https://img.shields.io/badge/%E2%98%95_%E8%AF%B7%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-%E5%BE%AE%E4%BF%A1%20%2F%20%E6%94%AF%E4%BB%98%E5%AE%9D-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
 
 <details>
@@ -138,6 +144,12 @@ Licensed under the [MIT License](LICENSE). This project only **invokes** the use
 ### ❤️ Donate
 
 If this project helps you, consider buying the author a coffee ☕
+
+International supporters can use GitHub Sponsors:
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-Support_this_project-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/shao-ye)
+
+Supporters in mainland China can use WeChat or Alipay:
 
 [![Buy me a coffee](https://img.shields.io/badge/%E2%98%95_Buy_me_a_coffee-WeChat%20%2F%20Alipay-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://mpp.shaoyeai.com/#sponsor)
 

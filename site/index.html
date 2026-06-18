@@ -156,8 +156,19 @@
   .download-box .note { color: var(--muted); font-size: 13px; margin-top: 18px; }
 
   .sponsor { text-align: center; }
+  .sponsor .section-desc { margin-bottom: 28px; }
+  .sponsor .support-label {
+    color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 12px;
+  }
+  .sponsor .sponsors-button {
+    background: #ea4aaa; border-color: #ea4aaa; color: #fff; padding: 11px 22px;
+  }
+  .sponsor .sponsors-button:hover {
+    border-color: #f06aaf; box-shadow: 0 8px 24px rgba(234,74,170,.28);
+  }
+  .sponsor .local-support { margin-top: 38px; }
   .sponsor .qr-list {
-    display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 24px;
+    display: flex; justify-content: center; gap: 28px; flex-wrap: wrap;
   }
   .sponsor .qr {
     background: #fff; padding: 14px; border-radius: 14px;
@@ -292,6 +303,13 @@
   <div class="wrap sponsor">
     <h2 class="section-title" data-i18n="sponsorTitle">赞助支持</h2>
     <p class="section-desc" data-i18n="sponsorDesc">开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡。</p>
+    <div>
+      <p class="support-label" data-i18n="internationalSupport">国际用户</p>
+      <a class="btn sponsors-button" href="https://github.com/sponsors/shao-ye" target="_blank" rel="noopener" data-i18n="githubSponsors">通过 GitHub Sponsors 赞助</a>
+    </div>
+    <div class="local-support">
+      <p class="support-label" data-i18n="mainlandSupport">中国大陆用户</p>
+    </div>
     <div class="qr-list">
       <div>
         <div class="qr"><img src="assets/donate-wechat.jpg" alt="微信赞赏码" data-i18n-attr="alt:wechatAlt"></div>
@@ -362,6 +380,9 @@ const translations = {
     downloadNote: '需自备 mihomo / xray 内核（可直接复用 v2rayN 安装目录下的）',
     sponsorTitle: '赞助支持',
     sponsorDesc: '开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡。',
+    internationalSupport: '国际用户',
+    githubSponsors: '通过 GitHub Sponsors 赞助',
+    mainlandSupport: '中国大陆用户',
     wechatAlt: '微信赞赏码',
     wechatPay: '微信赞赏',
     alipayAlt: '支付宝收款码',
@@ -410,6 +431,9 @@ const translations = {
     downloadNote: 'Requires local mihomo / xray cores. You can reuse the ones installed with v2rayN.',
     sponsorTitle: 'Sponsor',
     sponsorDesc: 'Open source takes time. If this project helps you, a small coffee is appreciated.',
+    internationalSupport: 'International support',
+    githubSponsors: 'Sponsor on GitHub',
+    mainlandSupport: 'Mainland China',
     wechatAlt: 'WeChat reward QR code',
     wechatPay: 'WeChat',
     alipayAlt: 'Alipay payment QR code',
