@@ -94,6 +94,8 @@ go build -ldflags "-H windowsgui" -o MultiPortProxy.exe .
 
 开源不易，如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
 
+公开 GitHub Sponsors 支持者会自动展示在[项目官网鸣谢墙](https://mpp.shaoyeai.com/#sponsor)。隐私赞助不会公开身份。
+
 国际用户可以通过 GitHub Sponsors 支持项目：
 
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-%E8%B5%9E%E5%8A%A9%E9%A1%B9%E7%9B%AE-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/shao-ye)
@@ -153,6 +155,8 @@ Join the [Telegram group](https://t.me/MultiPortProxy) for support, feedback, an
 ### ❤️ Donate
 
 If this project helps you, consider buying the author a coffee ☕
+
+Public GitHub Sponsors supporters are automatically listed on the [project sponsor wall](https://mpp.shaoyeai.com/#sponsor). Private sponsorships never reveal identity.
 
 International supporters can use GitHub Sponsors:
 

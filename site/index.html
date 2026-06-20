@@ -157,6 +157,19 @@
 
   .sponsor { text-align: center; }
   .sponsor .section-desc { margin-bottom: 28px; }
+  .sponsor-purpose {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    margin: 0 auto 34px; max-width: 920px; text-align: left;
+  }
+  .purpose-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px;
+  }
+  .purpose-card .purpose-index {
+    display: block; color: var(--brand2); font: 700 12px/1 Consolas, monospace;
+    letter-spacing: .1em; margin-bottom: 14px;
+  }
+  .purpose-card h3 { font-size: 16px; margin-bottom: 7px; }
+  .purpose-card p { color: var(--muted); font-size: 13.5px; }
   .sponsor .support-label {
     color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 12px;
   }
@@ -177,6 +190,52 @@
   .sponsor .qr img { width: 230px; height: 230px; display: block; object-fit: contain; border-radius: 6px; }
   .sponsor .qr-label { color: var(--text); font-weight: 700; margin-top: 12px; }
   .sponsor .thanks { color: var(--muted); margin-top: 20px; font-size: 14px; }
+  .sponsor .non-financial {
+    max-width: 680px; margin: 34px auto 0; padding: 16px 20px; border-radius: 12px;
+    color: var(--muted); background: rgba(59,130,246,.07); border: 1px solid rgba(59,130,246,.18);
+    font-size: 13.5px;
+  }
+  .sponsor .non-financial a { color: var(--brand2); font-weight: 700; }
+  .sponsor-wall {
+    max-width: 920px; margin: 54px auto 0; padding-top: 44px;
+    border-top: 1px solid var(--border); text-align: left;
+  }
+  .sponsor-wall-head {
+    display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 20px;
+  }
+  .sponsor-wall-head h3 { font-size: 23px; margin-bottom: 5px; }
+  .sponsor-wall-head p { color: var(--muted); font-size: 13.5px; }
+  .sponsor-count {
+    flex: 0 0 auto; color: var(--brand2); background: rgba(6,182,212,.1);
+    border: 1px solid rgba(6,182,212,.24); border-radius: 999px; padding: 5px 11px;
+    font-size: 12px; font-weight: 700;
+  }
+  .sponsor-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  }
+  .sponsor-person {
+    display: flex; align-items: center; gap: 13px; min-width: 0;
+    padding: 15px; border-radius: 12px; background: var(--card); border: 1px solid var(--border);
+    transition: border-color .2s, transform .2s;
+  }
+  .sponsor-person:hover { border-color: rgba(234,74,170,.58); transform: translateY(-2px); }
+  .sponsor-person img {
+    width: 42px; height: 42px; flex: 0 0 auto; border-radius: 50%; object-fit: cover;
+    background: var(--bg2); border: 1px solid rgba(255,255,255,.08);
+  }
+  .sponsor-person-info { min-width: 0; }
+  .sponsor-person-name {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text); font-size: 14px; font-weight: 700;
+  }
+  .sponsor-person-tier {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--muted); font-size: 12px; margin-top: 2px;
+  }
+  .sponsor-wall-state {
+    grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--muted);
+    border: 1px dashed rgba(138,147,166,.3); border-radius: 12px; font-size: 13.5px;
+  }
 
   .disclaimer {
     max-width: 760px; margin: 60px auto 0; padding: 20px 24px; border-radius: 12px;
@@ -198,10 +257,12 @@
     .language-list { right: -42px; }
     .download-box { padding: 32px 20px; }
     .sponsor .qr-list { gap: 18px; }
+    .sponsor-purpose, .sponsor-grid { grid-template-columns: 1fr; }
+    .sponsor-wall-head { align-items: flex-start; }
   }
 </style>
 </head>
-<body>
+<body data-sponsors-api="/api/sponsors">
 
 <nav>
   <div class="wrap">
@@ -302,7 +363,24 @@
 <section id="sponsor" style="background:var(--bg2);">
   <div class="wrap sponsor">
     <h2 class="section-title" data-i18n="sponsorTitle">赞助支持</h2>
-    <p class="section-desc" data-i18n="sponsorDesc">开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡。</p>
+    <p class="section-desc" data-i18n="sponsorDesc">你的支持会直接投入兼容性维护、协议适配和更可靠的发布体验。</p>
+    <div class="sponsor-purpose">
+      <article class="purpose-card">
+        <span class="purpose-index">01</span>
+        <h3 data-i18n="purposeMaintenanceTitle">持续兼容维护</h3>
+        <p data-i18n="purposeMaintenanceText">跟进 v2rayN、mihomo、xray 和 Windows 环境变化，减少升级后的使用断层。</p>
+      </article>
+      <article class="purpose-card">
+        <span class="purpose-index">02</span>
+        <h3 data-i18n="purposeProtocolsTitle">协议与体验改进</h3>
+        <p data-i18n="purposeProtocolsText">完善新传输协议支持、节点管理、故障提示和多环境工作流。</p>
+      </article>
+      <article class="purpose-card">
+        <span class="purpose-index">03</span>
+        <h3 data-i18n="purposeReleaseTitle">可靠发布与文档</h3>
+        <p data-i18n="purposeReleaseText">维护官网、下载校验、双语文档和社区支持，让使用过程更安心。</p>
+      </article>
+    </div>
     <div>
       <p class="support-label" data-i18n="internationalSupport">国际用户</p>
       <a class="btn sponsors-button" href="https://github.com/sponsors/shao-ye" target="_blank" rel="noopener" data-i18n="githubSponsors">通过 GitHub Sponsors 赞助</a>
@@ -321,6 +399,20 @@
       </div>
     </div>
     <p class="thanks" data-i18n="thanks">微信或支付宝扫一扫 · 感谢每一份支持</p>
+    <p class="non-financial" data-i18n-html="nonFinancialSupport">暂时不方便赞助也完全没关系。给项目一个 <a href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">Star</a>、提交问题或分享真实使用反馈，同样非常有帮助。</p>
+
+    <div class="sponsor-wall">
+      <div class="sponsor-wall-head">
+        <div>
+          <h3 data-i18n="sponsorWallTitle">感谢公开赞助者</h3>
+          <p data-i18n="sponsorWallDesc">这里仅展示选择公开身份的 GitHub Sponsors 支持者。</p>
+        </div>
+        <span class="sponsor-count" id="sponsorCount" data-i18n="sponsorCountLoading">读取中</span>
+      </div>
+      <div class="sponsor-grid" id="sponsorGrid" aria-live="polite">
+        <p class="sponsor-wall-state" data-i18n="sponsorLoading">正在加载公开赞助者…</p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -379,7 +471,13 @@ const translations = {
     latestVersion: '最新版本见 <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a>',
     downloadNote: '需自备 mihomo / xray 内核（可直接复用 v2rayN 安装目录下的）',
     sponsorTitle: '赞助支持',
-    sponsorDesc: '开源不易，如果这个项目帮到了你，欢迎请作者喝杯咖啡。',
+    sponsorDesc: '你的支持会直接投入兼容性维护、协议适配和更可靠的发布体验。',
+    purposeMaintenanceTitle: '持续兼容维护',
+    purposeMaintenanceText: '跟进 v2rayN、mihomo、xray 和 Windows 环境变化，减少升级后的使用断层。',
+    purposeProtocolsTitle: '协议与体验改进',
+    purposeProtocolsText: '完善新传输协议支持、节点管理、故障提示和多环境工作流。',
+    purposeReleaseTitle: '可靠发布与文档',
+    purposeReleaseText: '维护官网、下载校验、双语文档和社区支持，让使用过程更安心。',
     internationalSupport: '国际用户',
     githubSponsors: '通过 GitHub Sponsors 赞助',
     mainlandSupport: '中国大陆用户',
@@ -388,6 +486,16 @@ const translations = {
     alipayAlt: '支付宝收款码',
     alipay: '支付宝',
     thanks: '微信或支付宝扫一扫 · 感谢每一份支持',
+    nonFinancialSupport: '暂时不方便赞助也完全没关系。给项目一个 <a href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">Star</a>、提交问题或分享真实使用反馈，同样非常有帮助。',
+    sponsorWallTitle: '感谢公开赞助者',
+    sponsorWallDesc: '这里仅展示选择公开身份的 GitHub Sponsors 支持者。',
+    sponsorCountLoading: '读取中',
+    sponsorCount: '{count} 位支持者',
+    sponsorLoading: '正在加载公开赞助者…',
+    sponsorEmpty: '鸣谢墙正在等待第一位公开赞助者。感谢每一份支持，无论金额大小。',
+    sponsorLoadError: '赞助者名单暂时无法加载，请稍后再试。',
+    sponsorOneTime: '一次性支持',
+    sponsorMonthly: '月度支持',
     disclaimer: '<strong>免责声明：</strong>本工具仅用于在本机对你自己拥有合法使用权的代理节点做端口管理与分发，方便多环境调试等技术用途。使用者须遵守所在国家和地区的法律法规，并对自己的使用行为负全部责任。作者不对任何滥用行为承担责任。'
   },
   en: {
@@ -430,7 +538,13 @@ const translations = {
     latestVersion: 'Latest version on <a href="https://github.com/shao-ye/MultiPortProxy/releases/latest" style="color:var(--brand2)" target="_blank" rel="noopener">GitHub Releases</a>',
     downloadNote: 'Requires local mihomo / xray cores. You can reuse the ones installed with v2rayN.',
     sponsorTitle: 'Sponsor',
-    sponsorDesc: 'Open source takes time. If this project helps you, a small coffee is appreciated.',
+    sponsorDesc: 'Your support goes directly toward compatibility work, protocol support, and more reliable releases.',
+    purposeMaintenanceTitle: 'Compatibility upkeep',
+    purposeMaintenanceText: 'Keep pace with changes in v2rayN, mihomo, xray, and Windows so upgrades remain smooth.',
+    purposeProtocolsTitle: 'Protocols and usability',
+    purposeProtocolsText: 'Improve transport support, node management, diagnostics, and multi-profile workflows.',
+    purposeReleaseTitle: 'Reliable releases and docs',
+    purposeReleaseText: 'Maintain the website, checksums, bilingual documentation, and community support.',
     internationalSupport: 'International support',
     githubSponsors: 'Sponsor on GitHub',
     mainlandSupport: 'Mainland China',
@@ -439,6 +553,16 @@ const translations = {
     alipayAlt: 'Alipay payment QR code',
     alipay: 'Alipay',
     thanks: 'Scan with WeChat or Alipay · Thank you for the support',
+    nonFinancialSupport: 'Sponsorship is always optional. A <a href="https://github.com/shao-ye/MultiPortProxy" target="_blank" rel="noopener">GitHub Star</a>, a clear bug report, or thoughtful feedback helps just as much.',
+    sponsorWallTitle: 'Thanks to public sponsors',
+    sponsorWallDesc: 'Only GitHub Sponsors supporters who choose a public identity are shown here.',
+    sponsorCountLoading: 'Loading',
+    sponsorCount: '{count} supporters',
+    sponsorLoading: 'Loading public sponsors…',
+    sponsorEmpty: 'The wall is ready for its first public sponsor. Every contribution is appreciated.',
+    sponsorLoadError: 'The sponsor list is temporarily unavailable. Please try again later.',
+    sponsorOneTime: 'One-time support',
+    sponsorMonthly: 'Monthly support',
     disclaimer: '<strong>Disclaimer:</strong> This tool is only for managing and distributing proxy nodes that you are legally entitled to use on your own machine, for technical workflows such as multi-profile testing. You are responsible for complying with applicable laws and regulations. The author assumes no liability for misuse.'
   }
 };
@@ -474,6 +598,103 @@ function applyLanguage(language) {
   });
   document.getElementById('languageCurrent').textContent = lang === 'en' ? 'EN' : '中文';
   localStorage.setItem('mpp-site-language', lang);
+  renderSponsors();
+}
+
+let publicSponsors = null;
+let sponsorLoadState = 'loading';
+
+function safeExternalUrl(value, allowedHosts) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !allowedHosts.some(host => url.hostname === host || url.hostname.endsWith('.' + host))) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function renderSponsors() {
+  const grid = document.getElementById('sponsorGrid');
+  const count = document.getElementById('sponsorCount');
+  if (!grid || !count) return;
+  const language = document.documentElement.lang === 'en' ? 'en' : 'zh-CN';
+  const dict = translations[language];
+  grid.replaceChildren();
+
+  if (sponsorLoadState === 'loading') {
+    count.textContent = dict.sponsorCountLoading;
+    const state = document.createElement('p');
+    state.className = 'sponsor-wall-state';
+    state.textContent = dict.sponsorLoading;
+    grid.appendChild(state);
+    return;
+  }
+  if (sponsorLoadState === 'error' || !Array.isArray(publicSponsors)) {
+    count.textContent = '—';
+    const state = document.createElement('p');
+    state.className = 'sponsor-wall-state';
+    state.textContent = dict.sponsorLoadError;
+    grid.appendChild(state);
+    return;
+  }
+
+  count.textContent = dict.sponsorCount.replace('{count}', String(publicSponsors.length));
+  if (publicSponsors.length === 0) {
+    const state = document.createElement('p');
+    state.className = 'sponsor-wall-state';
+    state.textContent = dict.sponsorEmpty;
+    grid.appendChild(state);
+    return;
+  }
+
+  publicSponsors.forEach(sponsor => {
+    const profileUrl = safeExternalUrl(sponsor.profileUrl, ['github.com']);
+    const avatarUrl = safeExternalUrl(sponsor.avatarUrl, ['githubusercontent.com']);
+    if (!profileUrl || !avatarUrl || typeof sponsor.login !== 'string') return;
+
+    const card = document.createElement('a');
+    card.className = 'sponsor-person';
+    card.href = profileUrl;
+    card.target = '_blank';
+    card.rel = 'noopener';
+
+    const avatar = document.createElement('img');
+    avatar.src = avatarUrl;
+    avatar.alt = '';
+    avatar.loading = 'lazy';
+    avatar.width = 42;
+    avatar.height = 42;
+
+    const info = document.createElement('span');
+    info.className = 'sponsor-person-info';
+    const name = document.createElement('span');
+    name.className = 'sponsor-person-name';
+    name.textContent = sponsor.login;
+    const tier = document.createElement('span');
+    tier.className = 'sponsor-person-tier';
+    const supportType = sponsor.isOneTime ? dict.sponsorOneTime : dict.sponsorMonthly;
+    tier.textContent = sponsor.tierName ? `${sponsor.tierName} · ${supportType}` : supportType;
+
+    info.append(name, tier);
+    card.append(avatar, info);
+    grid.appendChild(card);
+  });
+}
+
+async function loadSponsors() {
+  try {
+    const endpoint = document.body.dataset.sponsorsApi || '/api/sponsors';
+    const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!payload || !Array.isArray(payload.sponsors)) throw new Error('Invalid response');
+    publicSponsors = payload.sponsors;
+    sponsorLoadState = 'loaded';
+  } catch {
+    sponsorLoadState = 'error';
+  }
+  renderSponsors();
 }
 
 const languageMenu = document.getElementById('languageMenu');
@@ -505,6 +726,7 @@ document.addEventListener('keydown', event => {
 });
 
 applyLanguage(getLanguage());
+loadSponsors();
 </script>
 </body>
 </html>
